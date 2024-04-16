@@ -5,7 +5,7 @@ use cosmos::{
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
-use crate::{authz, chain, contract, nft, parsed_coin::ParsedCoin, tokenfactory};
+use crate::{authz, chain, contract, nft, tokenfactory};
 
 /// Command line tool for interacting with Cosmos chains
 #[derive(clap::Parser)]
@@ -63,16 +63,13 @@ impl TxOpt {
 
 #[derive(clap::Parser)]
 pub(crate) enum Subcommand {
+    /// Bank module operations
+    Bank {
+        #[clap(flatten)]
+        opt: crate::bank::Opt,
+    },
     /// Show config
     ShowConfig {},
-    /// Print balances
-    PrintBalances {
-        /// Address on COSMOS blockchain
-        address: Address,
-        /// Optional height to do the query at
-        #[clap(long)]
-        height: Option<u64>,
-    },
     /// Generate wallet
     GenWallet {
         /// Address type, supports any valid Human Readable Part like cosmos, osmo, or juno
@@ -84,15 +81,6 @@ pub(crate) enum Subcommand {
         hrp: AddressHrp,
         /// Phrase
         phrase: SeedPhrase,
-    },
-    /// Send coins to the given address
-    SendCoins {
-        #[clap(flatten)]
-        tx_opt: TxOpt,
-        /// Destination address
-        dest: Address,
-        /// Coins to send
-        coins: Vec<ParsedCoin>,
     },
     /// Show transaction details
     ShowTx {

@@ -1,4 +1,5 @@
 mod authz;
+mod bank;
 mod chain;
 mod cli;
 mod contract;
@@ -12,11 +13,8 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use cli::Subcommand;
 use cosmos::{
-    proto::{
-        cosmos::{bank::v1beta1::MsgSend, base::abci::v1beta1::TxResponse},
-        traits::Message,
-    },
-    AddressHrp, BlockInfo, Coin, HasAddress, HasAddressHrp, TxBuilder,
+    proto::{cosmos::base::abci::v1beta1::TxResponse, traits::Message},
+    AddressHrp, BlockInfo,
 };
 
 #[tokio::main]
@@ -32,42 +30,17 @@ async fn main() -> Result<()> {
 impl Subcommand {
     pub(crate) async fn go(self, opt: cli::Opt) -> Result<()> {
         match self {
+            Subcommand::Bank { opt: bank_opt } => {
+                let cosmos = opt.network_opt.build().await?;
+                bank::go(cosmos, bank_opt).await?;
+            }
             Subcommand::ShowConfig {} => {
                 let cosmos = opt.network_opt.into_builder().await?;
                 println!("{:#?}", cosmos);
             }
-            Subcommand::PrintBalances { address, height } => {
-                let cosmos = opt.network_opt.build().await?;
-                let balances = cosmos.at_height(height).all_balances(address).await?;
-                for Coin { denom, amount } in &balances {
-                    println!("{amount}{denom}");
-                }
-                if balances.is_empty() {
-                    println!("0");
-                }
-            }
             Subcommand::GenWallet { address_type } => gen_wallet(address_type)?,
             Subcommand::PrintAddress { hrp, phrase } => {
                 println!("{}", phrase.with_hrp(hrp)?);
-            }
-            Subcommand::SendCoins {
-                tx_opt,
-                dest,
-                coins,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                let address_type = cosmos.get_address_hrp();
-                let wallet = tx_opt.get_wallet(address_type)?;
-                let mut builder = TxBuilder::default();
-                builder.add_message(MsgSend {
-                    from_address: wallet.get_address_string(),
-                    to_address: dest.get_address_string(),
-                    amount: coins.into_iter().map(|x| x.into()).collect(),
-                });
-                builder.set_optional_memo(tx_opt.memo);
-                let txres = builder.sign_and_broadcast(&cosmos, &wallet).await?;
-
-                println!("{}", txres.txhash);
             }
             Subcommand::ShowTx {
                 txhash,
