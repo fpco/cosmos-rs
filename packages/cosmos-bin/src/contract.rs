@@ -48,7 +48,7 @@ enum Subcommand {
         file: PathBuf,
     },
     /// Instantiate contract
-    InstantiateContract {
+    Instantiate {
         #[clap(flatten)]
         tx_opt: TxOpt,
         /// Code to deploy
@@ -62,7 +62,7 @@ enum Subcommand {
         admin: ContractAdmin,
     },
     /// Query contract
-    QueryContract {
+    Query {
         /// Contract address
         address: Address,
         /// Query (in JSON)
@@ -71,7 +71,7 @@ enum Subcommand {
         height: Option<u64>,
     },
     /// Look up a raw value in the contract's storage
-    RawQueryContract {
+    RawQuery {
         /// Contract address
         address: Address,
         /// Key
@@ -80,7 +80,7 @@ enum Subcommand {
         height: Option<u64>,
     },
     /// Migrate contract
-    MigrateContract {
+    Migrate {
         #[clap(flatten)]
         tx_opt: TxOpt,
         /// Contract address
@@ -91,7 +91,7 @@ enum Subcommand {
         msg: String,
     },
     /// Execute contract
-    ExecuteContract {
+    Execute {
         #[clap(flatten)]
         tx_opt: TxOpt,
         /// Contract address
@@ -106,7 +106,7 @@ enum Subcommand {
         skip_simulate: Option<u64>,
     },
     /// Simulate executing a message, but don't actually do it
-    SimulateContract {
+    Simulate {
         #[clap(long, env = "COSMOS_SENDER")]
         sender: RawAddress,
         /// Memo to put on transaction
@@ -120,9 +120,9 @@ enum Subcommand {
         funds: Option<String>,
     },
     /// Get contract metadata
-    ContractInfo { contract: Address },
+    Info { contract: Address },
     /// Get the contract history
-    ContractHistory { contract: Address },
+    History { contract: Address },
     /// Download the code for a given code ID
     Download {
         #[clap(long)]
@@ -173,7 +173,7 @@ pub(crate) async fn go(
             let codeid = cosmos.store_code_path(&wallet, &file).await?;
             println!("Code ID: {codeid}");
         }
-        Subcommand::InstantiateContract {
+        Subcommand::Instantiate {
             tx_opt,
             code_id,
             label,
@@ -187,7 +187,7 @@ pub(crate) async fn go(
                 .await?;
             println!("Contract: {contract}");
         }
-        Subcommand::QueryContract {
+        Subcommand::Query {
             address,
             query,
             height,
@@ -202,7 +202,7 @@ pub(crate) async fn go(
             stdout.write_all(&x)?;
             stdout.write_all(b"\n")?;
         }
-        Subcommand::RawQueryContract {
+        Subcommand::RawQuery {
             address,
             key,
             height,
@@ -214,7 +214,7 @@ pub(crate) async fn go(
             stdout.write_all(&x)?;
             stdout.write_all(b"\n")?;
         }
-        Subcommand::MigrateContract {
+        Subcommand::Migrate {
             tx_opt,
             address,
             code_id,
@@ -226,7 +226,7 @@ pub(crate) async fn go(
                 .migrate_binary(&tx_opt.get_wallet(address_type)?, code_id, msg)
                 .await?;
         }
-        Subcommand::ExecuteContract {
+        Subcommand::Execute {
             tx_opt,
             address,
             msg,
@@ -265,7 +265,7 @@ pub(crate) async fn go(
             println!("Raw log: {}", tx.raw_log);
             tracing::debug!("{tx:?}");
         }
-        Subcommand::ContractInfo { contract } => {
+        Subcommand::Info { contract } => {
             let ContractInfo {
                 code_id,
                 creator,
@@ -280,7 +280,7 @@ pub(crate) async fn go(
             println!("admin: {admin}");
             println!("label: {label}");
         }
-        Subcommand::ContractHistory { contract } => {
+        Subcommand::History { contract } => {
             let QueryContractHistoryResponse {
                 entries,
                 pagination: _,
@@ -295,7 +295,7 @@ pub(crate) async fn go(
                 println!("Operation: {operation}. Code ID: {code_id}. Updated: {updated:?}. Message: {:?}", String::from_utf8(msg))
             }
         }
-        Subcommand::SimulateContract {
+        Subcommand::Simulate {
             sender,
             memo,
             address,
