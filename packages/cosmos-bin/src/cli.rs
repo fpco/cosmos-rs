@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmos::{clap::CosmosOpt, error::WalletError, Address, AddressHrp, SeedPhrase, Wallet};
+use cosmos::{clap::CosmosOpt, error::WalletError, AddressHrp, SeedPhrase, Wallet};
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
@@ -71,38 +71,11 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         opt: crate::wallet::Opt,
     },
-    /// Show config
-    ShowConfig {},
-    /// Show transaction details
-    ShowTx {
-        txhash: String,
-        /// Show all the data in the transaction?
-        #[clap(long)]
-        complete: bool,
-        /// Pretty-print JSON output?
-        #[clap(long)]
-        pretty: bool,
-    },
-    /// List transactions for a given wallet
-    ListTxsFor {
-        address: Address,
-        /// Maximum number of transactions to return
-        #[clap(long)]
-        limit: Option<u64>,
-        /// Offset
-        #[clap(long)]
-        offset: Option<u64>,
-    },
     /// Generate bash shell completion script
     GenerateShellCompletions {
         /// Which shell to generate for
         #[clap(default_value_t = clap_complete::Shell::Bash)]
         shell: clap_complete::Shell,
-    },
-    /// Show block metadata and transaction hashes within the block
-    ShowBlock {
-        /// Height of the block to show
-        height: i64,
     },
     /// NFT focused subcommands
     Nft {

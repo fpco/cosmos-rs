@@ -13,10 +13,7 @@ mod wallet;
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use cli::Subcommand;
-use cosmos::{
-    proto::{cosmos::base::abci::v1beta1::TxResponse, traits::Message},
-    AddressHrp, BlockInfo,
-};
+use cosmos::AddressHrp;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -38,69 +35,6 @@ impl Subcommand {
             Subcommand::Wallet { opt } => {
                 wallet::go(opt).await?;
             }
-            Subcommand::ShowConfig {} => {
-                let cosmos = opt.network_opt.into_builder().await?;
-                println!("{:#?}", cosmos);
-            }
-            Subcommand::ShowTx {
-                txhash,
-                complete,
-                pretty,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                let TxResponse {
-                    height,
-                    txhash: _,
-                    codespace,
-                    code,
-                    data,
-                    raw_log,
-                    logs,
-                    info,
-                    gas_wanted,
-                    gas_used,
-                    tx,
-                    timestamp,
-                    events,
-                } = cosmos.get_transaction_body(txhash).await?.1;
-                println!("Height: {height}");
-                println!("Code: {code}");
-                println!("Codespace: {codespace}");
-                if pretty {
-                    match serde_json::from_str::<serde_json::Value>(&raw_log) {
-                        Err(_) => println!("Raw log is not JSON: {raw_log}"),
-                        Ok(raw_log) => serde_json::to_writer_pretty(std::io::stdout(), &raw_log)?,
-                    }
-                } else {
-                    println!("Raw log: {raw_log}");
-                }
-                println!("Info: {info}");
-                println!("Gas wanted: {gas_wanted}");
-                println!("Gas used: {gas_used}");
-                println!("Timestamp: {timestamp}");
-                if complete {
-                    println!("Data: {data}");
-                    for (idx, log) in logs.into_iter().enumerate() {
-                        println!("Log #{idx}: {log:?}");
-                    }
-                    for (idx, event) in events.into_iter().enumerate() {
-                        println!("Event #{idx}: {event:?}");
-                    }
-                }
-                if let Some(tx) = tx {
-                    println!("Encoded length: {}", tx.encoded_len());
-                }
-            }
-            Subcommand::ListTxsFor {
-                address,
-                limit,
-                offset,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                for txhash in cosmos.list_transactions_for(address, limit, offset).await? {
-                    println!("{txhash}");
-                }
-            }
             Subcommand::GenerateShellCompletions { shell } => {
                 clap_complete::generate(
                     shell,
@@ -108,23 +42,6 @@ impl Subcommand {
                     "cosmos",
                     &mut std::io::stdout(),
                 );
-            }
-            Subcommand::ShowBlock { height } => {
-                let cosmos = opt.network_opt.build().await?;
-                let BlockInfo {
-                    height,
-                    timestamp,
-                    txhashes,
-                    block_hash,
-                    chain_id,
-                } = cosmos.get_block_info(height).await?;
-                println!("Chain ID: {chain_id}");
-                println!("Height: {height}");
-                println!("Timestamp: {timestamp}");
-                println!("Block hash: {block_hash}");
-                for (idx, txhash) in txhashes.into_iter().enumerate() {
-                    println!("Transaction #{}: {txhash}", idx + 1);
-                }
             }
             Subcommand::Nft {
                 opt: inner,
@@ -138,8 +55,7 @@ impl Subcommand {
                 contract::go(inner, cosmos).await?;
             }
             Subcommand::Chain { opt: inner } => {
-                let cosmos = opt.network_opt.build().await?;
-                chain::go(inner, cosmos).await?;
+                chain::go(inner, opt).await?;
             }
             Subcommand::TokenFactory { cmd, wallet } => {
                 let cosmos = opt.network_opt.build().await?;
