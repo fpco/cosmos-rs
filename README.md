@@ -1,2 +1,3 @@
 # cosmos-rs
-Library and CLI tool for interacting with Cosmos chains over gRPC
+
+Rust library and CLI utility for interacting with Cosmos blockchains over gRPC.
