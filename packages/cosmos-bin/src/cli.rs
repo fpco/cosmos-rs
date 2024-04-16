@@ -1,9 +1,6 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 use cosmos::{
-    clap::CosmosOpt, error::WalletError, Address, AddressHrp, ContractAdmin, RawAddress,
-    SeedPhrase, Wallet,
+    clap::CosmosOpt, error::WalletError, Address, AddressHrp, RawAddress, SeedPhrase, Wallet,
 };
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
@@ -68,26 +65,6 @@ impl TxOpt {
 pub(crate) enum Subcommand {
     /// Show config
     ShowConfig {},
-    /// Upload contract
-    StoreCode {
-        #[clap(flatten)]
-        tx_opt: TxOpt,
-        file: PathBuf,
-    },
-    /// Instantiate contract
-    InstantiateContract {
-        #[clap(flatten)]
-        tx_opt: TxOpt,
-        /// Code to deploy
-        code_id: u64,
-        /// Label to display
-        label: String,
-        /// Instantiate message (JSON)
-        msg: String,
-        /// Administrator set on this contract
-        #[clap(long, default_value = "sender")]
-        admin: ContractAdmin,
-    },
     /// Print balances
     PrintBalances {
         /// Address on COSMOS blockchain
@@ -95,64 +72,6 @@ pub(crate) enum Subcommand {
         /// Optional height to do the query at
         #[clap(long)]
         height: Option<u64>,
-    },
-    /// Query contract
-    QueryContract {
-        /// Contract address
-        address: Address,
-        /// Query (in JSON)
-        query: String,
-        /// Optional Height. Use latest if not passed.
-        height: Option<u64>,
-    },
-    /// Look up a raw value in the contract's storage
-    RawQueryContract {
-        /// Contract address
-        address: Address,
-        /// Key
-        key: String,
-        /// Optional Height. Use latest if not passed.
-        height: Option<u64>,
-    },
-    /// Migrate contract
-    MigrateContract {
-        #[clap(flatten)]
-        tx_opt: TxOpt,
-        /// Contract address
-        address: Address,
-        /// New code ID
-        code_id: u64,
-        /// Migrate message (JSON)
-        msg: String,
-    },
-    /// Execute contract
-    ExecuteContract {
-        #[clap(flatten)]
-        tx_opt: TxOpt,
-        /// Contract address
-        address: Address,
-        /// Execute message (JSON)
-        msg: String,
-        /// Funds. Example 100ujunox
-        #[clap(long)]
-        funds: Option<String>,
-        /// Skip the simulate phase and hard-code the given gas request instead
-        #[clap(long)]
-        skip_simulate: Option<u64>,
-    },
-    /// Simulate executing a message, but don't actually do it
-    SimulateContract {
-        #[clap(long, env = "COSMOS_SENDER")]
-        sender: RawAddress,
-        /// Memo to put on transaction
-        #[clap(long)]
-        memo: Option<String>,
-        /// Contract address
-        address: Address,
-        /// Execute message (JSON)
-        msg: String,
-        /// Funds. Example 100ujunox
-        funds: Option<String>,
     },
     /// Generate wallet
     GenWallet {
@@ -175,8 +94,6 @@ pub(crate) enum Subcommand {
         /// Coins to send
         coins: Vec<ParsedCoin>,
     },
-    /// Get contract metadata
-    ContractInfo { contract: Address },
     /// Show transaction details
     ShowTx {
         txhash: String,
@@ -197,8 +114,6 @@ pub(crate) enum Subcommand {
         #[clap(long)]
         offset: Option<u64>,
     },
-    /// Get the contract history
-    ContractHistory { contract: Address },
     /// Generate bash shell completion script
     GenerateShellCompletions {
         /// Which shell to generate for
@@ -253,10 +168,5 @@ pub(crate) enum Subcommand {
     Cw3 {
         #[clap(flatten)]
         opt: crate::cw3::Opt,
-    },
-    /// Code ID operations
-    Code {
-        #[clap(flatten)]
-        opt: crate::code::Opt,
     },
 }

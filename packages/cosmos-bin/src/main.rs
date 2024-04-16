@@ -1,7 +1,6 @@
 mod authz;
 mod chain;
 mod cli;
-mod code;
 mod contract;
 mod cw3;
 mod my_duration;
@@ -9,23 +8,16 @@ mod nft;
 mod parsed_coin;
 mod tokenfactory;
 
-use std::{io::Write, str::FromStr};
-
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 use cli::Subcommand;
 use cosmos::{
     proto::{
         cosmos::{bank::v1beta1::MsgSend, base::abci::v1beta1::TxResponse},
-        cosmwasm::wasm::v1::{
-            ContractCodeHistoryEntry, ContractInfo, MsgExecuteContract,
-            QueryContractHistoryResponse,
-        },
         traits::Message,
     },
     AddressHrp, BlockInfo, Coin, HasAddress, HasAddressHrp, TxBuilder,
 };
-use parsed_coin::ParsedCoin;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -44,34 +36,6 @@ impl Subcommand {
                 let cosmos = opt.network_opt.into_builder().await?;
                 println!("{:#?}", cosmos);
             }
-            Subcommand::StoreCode { tx_opt, file } => {
-                let cosmos = opt.network_opt.build().await?;
-                let address_type = cosmos.get_address_hrp();
-                let wallet = tx_opt.get_wallet(address_type)?;
-                let codeid = cosmos.store_code_path(&wallet, &file).await?;
-                println!("Code ID: {codeid}");
-            }
-            Subcommand::InstantiateContract {
-                tx_opt,
-                code_id,
-                label,
-                msg,
-                admin,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                let address_type = cosmos.get_address_hrp();
-                let contract = cosmos
-                    .make_code_id(code_id)
-                    .instantiate_rendered(
-                        &tx_opt.get_wallet(address_type)?,
-                        label,
-                        vec![],
-                        msg,
-                        admin,
-                    )
-                    .await?;
-                println!("Contract: {contract}");
-            }
             Subcommand::PrintBalances { address, height } => {
                 let cosmos = opt.network_opt.build().await?;
                 let balances = cosmos.at_height(height).all_balances(address).await?;
@@ -81,86 +45,6 @@ impl Subcommand {
                 if balances.is_empty() {
                     println!("0");
                 }
-            }
-            Subcommand::QueryContract {
-                address,
-                query,
-                height,
-            } => {
-                let cosmos = opt.network_opt.build().await?.at_height(height);
-                let x = cosmos
-                    .make_contract(address)
-                    .query_rendered_bytes(query)
-                    .await?;
-                let stdout = std::io::stdout();
-                let mut stdout = stdout.lock();
-                stdout.write_all(&x)?;
-                stdout.write_all(b"\n")?;
-            }
-            Subcommand::RawQueryContract {
-                address,
-                key,
-                height,
-            } => {
-                let cosmos = opt.network_opt.build().await?.at_height(height);
-                let x = cosmos.make_contract(address).query_raw(key).await?;
-                let stdout = std::io::stdout();
-                let mut stdout = stdout.lock();
-                stdout.write_all(&x)?;
-                stdout.write_all(b"\n")?;
-            }
-            Subcommand::MigrateContract {
-                tx_opt,
-                address,
-                code_id,
-                msg,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                let address_type = cosmos.get_address_hrp();
-                let contract = cosmos.make_contract(address);
-                contract
-                    .migrate_binary(&tx_opt.get_wallet(address_type)?, code_id, msg)
-                    .await?;
-            }
-            Subcommand::ExecuteContract {
-                tx_opt,
-                address,
-                msg,
-                funds: amount,
-                skip_simulate,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                let address_type = cosmos.get_address_hrp();
-                let contract = cosmos.make_contract(address);
-                let amount = match amount {
-                    Some(funds) => {
-                        let coin = ParsedCoin::from_str(&funds)?.into();
-                        vec![coin]
-                    }
-                    None => vec![],
-                };
-                let wallet = tx_opt.get_wallet(address_type)?;
-
-                let mut tx_builder = TxBuilder::default();
-                tx_builder.add_message(MsgExecuteContract {
-                    sender: wallet.get_address_string(),
-                    contract: contract.get_address_string(),
-                    msg: msg.into_bytes(),
-                    funds: amount,
-                });
-
-                let tx = match skip_simulate {
-                    Some(gas_to_request) => {
-                        tx_builder
-                            .sign_and_broadcast_with_gas(&cosmos, &wallet, gas_to_request)
-                            .await?
-                    }
-                    None => tx_builder.sign_and_broadcast(&cosmos, &wallet).await?,
-                };
-
-                println!("Transaction hash: {}", tx.txhash);
-                println!("Raw log: {}", tx.raw_log);
-                tracing::debug!("{tx:?}");
             }
             Subcommand::GenWallet { address_type } => gen_wallet(address_type)?,
             Subcommand::PrintAddress { hrp, phrase } => {
@@ -184,22 +68,6 @@ impl Subcommand {
                 let txres = builder.sign_and_broadcast(&cosmos, &wallet).await?;
 
                 println!("{}", txres.txhash);
-            }
-            Subcommand::ContractInfo { contract } => {
-                let cosmos = opt.network_opt.build().await?;
-                let ContractInfo {
-                    code_id,
-                    creator,
-                    admin,
-                    label,
-                    created: _,
-                    ibc_port_id: _,
-                    extension: _,
-                } = cosmos.make_contract(contract).info().await?;
-                println!("code_id: {code_id}");
-                println!("creator: {creator}");
-                println!("admin: {admin}");
-                println!("label: {label}");
             }
             Subcommand::ShowTx {
                 txhash,
@@ -260,22 +128,6 @@ impl Subcommand {
                     println!("{txhash}");
                 }
             }
-            Subcommand::ContractHistory { contract } => {
-                let cosmos = opt.network_opt.build().await?;
-                let QueryContractHistoryResponse {
-                    entries,
-                    pagination: _,
-                } = cosmos.make_contract(contract).history().await?;
-                for ContractCodeHistoryEntry {
-                    operation,
-                    code_id,
-                    updated,
-                    msg,
-                } in entries
-                {
-                    println!("Operation: {operation}. Code ID: {code_id}. Updated: {updated:?}. Message: {:?}", String::from_utf8(msg))
-                }
-            }
             Subcommand::GenerateShellCompletions { shell } => {
                 clap_complete::generate(
                     shell,
@@ -283,28 +135,6 @@ impl Subcommand {
                     "cosmos",
                     &mut std::io::stdout(),
                 );
-            }
-            Subcommand::SimulateContract {
-                sender,
-                memo,
-                address,
-                msg,
-                funds,
-            } => {
-                let cosmos = opt.network_opt.build().await?;
-                let address_type = cosmos.get_address_hrp();
-                let contract = cosmos.make_contract(address);
-                let amount = match funds {
-                    Some(funds) => {
-                        let coin = ParsedCoin::from_str(&funds)?.into();
-                        vec![coin]
-                    }
-                    None => vec![],
-                };
-                let simres = contract
-                    .simulate_binary(sender.with_hrp(address_type), amount, msg, memo)
-                    .await?;
-                println!("{simres:?}");
             }
             Subcommand::ShowBlock { height } => {
                 let cosmos = opt.network_opt.build().await?;
@@ -355,10 +185,6 @@ impl Subcommand {
             Subcommand::Cw3 { opt: inner } => {
                 let cosmos = opt.network_opt.build().await?;
                 cw3::go(cosmos, inner).await?;
-            }
-            Subcommand::Code { opt: inner } => {
-                let cosmos = opt.network_opt.build().await?;
-                code::go(cosmos, inner).await?;
             }
         }
 
