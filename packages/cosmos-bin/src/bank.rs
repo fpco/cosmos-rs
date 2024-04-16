@@ -23,7 +23,7 @@ enum Subcommand {
         height: Option<u64>,
     },
     /// Send coins to the given address
-    SendCoins {
+    Send {
         #[clap(flatten)]
         tx_opt: TxOpt,
         /// Destination address
@@ -44,7 +44,7 @@ pub(crate) async fn go(cosmos: Cosmos, Opt { sub }: Opt) -> Result<()> {
                 println!("0");
             }
         }
-        Subcommand::SendCoins {
+        Subcommand::Send {
             tx_opt,
             dest,
             coins,
