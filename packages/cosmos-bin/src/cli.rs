@@ -1,7 +1,5 @@
 use anyhow::Result;
-use cosmos::{
-    clap::CosmosOpt, error::WalletError, Address, AddressHrp, RawAddress, SeedPhrase, Wallet,
-};
+use cosmos::{clap::CosmosOpt, error::WalletError, Address, AddressHrp, SeedPhrase, Wallet};
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
@@ -68,20 +66,13 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         opt: crate::bank::Opt,
     },
+    /// Management of wallets and seed phrases
+    Wallet {
+        #[clap(flatten)]
+        opt: crate::wallet::Opt,
+    },
     /// Show config
     ShowConfig {},
-    /// Generate wallet
-    GenWallet {
-        /// Address type, supports any valid Human Readable Part like cosmos, osmo, or juno
-        address_type: AddressHrp,
-    },
-    /// Print the address for the given phrase
-    PrintAddress {
-        /// HRP (human readable part) of the address, e.g. osmo, inj
-        hrp: AddressHrp,
-        /// Phrase
-        phrase: SeedPhrase,
-    },
     /// Show transaction details
     ShowTx {
         txhash: String,
@@ -112,13 +103,6 @@ pub(crate) enum Subcommand {
     ShowBlock {
         /// Height of the block to show
         height: i64,
-    },
-    /// Print the address for a different chain
-    ChangeAddressType {
-        /// Original address
-        orig: RawAddress,
-        /// Destination address HRP (human-readable part)
-        hrp: AddressHrp,
     },
     /// NFT focused subcommands
     Nft {

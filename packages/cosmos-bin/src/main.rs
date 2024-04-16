@@ -8,6 +8,7 @@ mod my_duration;
 mod nft;
 mod parsed_coin;
 mod tokenfactory;
+mod wallet;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -34,13 +35,12 @@ impl Subcommand {
                 let cosmos = opt.network_opt.build().await?;
                 bank::go(cosmos, bank_opt).await?;
             }
+            Subcommand::Wallet { opt } => {
+                wallet::go(opt).await?;
+            }
             Subcommand::ShowConfig {} => {
                 let cosmos = opt.network_opt.into_builder().await?;
                 println!("{:#?}", cosmos);
-            }
-            Subcommand::GenWallet { address_type } => gen_wallet(address_type)?,
-            Subcommand::PrintAddress { hrp, phrase } => {
-                println!("{}", phrase.with_hrp(hrp)?);
             }
             Subcommand::ShowTx {
                 txhash,
@@ -125,12 +125,6 @@ impl Subcommand {
                 for (idx, txhash) in txhashes.into_iter().enumerate() {
                     println!("Transaction #{}: {txhash}", idx + 1);
                 }
-            }
-            Subcommand::ChangeAddressType {
-                orig,
-                hrp: address_type,
-            } => {
-                println!("{}", orig.with_hrp(address_type));
             }
             Subcommand::Nft {
                 opt: inner,
