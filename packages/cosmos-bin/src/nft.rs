@@ -1,6 +1,6 @@
 use cosmos::{Address, Cosmos, HasAddress, HasAddressHrp, TxBuilder};
 
-use crate::TxOpt;
+use crate::cli::TxOpt;
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {

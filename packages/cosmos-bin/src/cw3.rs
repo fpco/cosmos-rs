@@ -8,7 +8,7 @@ use cw3::{ProposalListResponse, ProposalResponse};
 use cw4::Member;
 use cw_utils::Threshold;
 
-use crate::{my_duration::MyDuration, parsed_coin::ParsedCoin, TxOpt};
+use crate::{cli::TxOpt, my_duration::MyDuration, parsed_coin::ParsedCoin};
 
 #[derive(Clone, Copy, Debug)]
 enum ContractType {

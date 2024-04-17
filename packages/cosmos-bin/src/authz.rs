@@ -12,7 +12,7 @@ use cosmos::{
     Address, Cosmos, HasAddress, HasAddressHrp, TxBuilder, TxMessage,
 };
 
-use crate::{my_duration::MyDuration, parsed_coin::ParsedCoin, TxOpt};
+use crate::{cli::TxOpt, my_duration::MyDuration, parsed_coin::ParsedCoin};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {

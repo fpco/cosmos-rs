@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use cosmos::{Address, BlockInfo, Cosmos, TxResponseExt};
+use cosmos::{
+    proto::{cosmos::base::abci::v1beta1::TxResponse, traits::Message},
+    Address, BlockInfo, Cosmos, TxResponseExt,
+};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
@@ -47,32 +50,157 @@ pub(crate) enum Subcommand {
     Epoch {},
     /// Print Osmosis-specific txfees information.
     TxFees {},
+    /// Show config
+    ShowConfig {},
+    /// Show transaction details
+    ShowTx {
+        txhash: String,
+        /// Show all the data in the transaction?
+        #[clap(long)]
+        complete: bool,
+        /// Pretty-print JSON output?
+        #[clap(long)]
+        pretty: bool,
+    },
+    /// List transactions for a given wallet
+    ListTxsFor {
+        address: Address,
+        /// Maximum number of transactions to return
+        #[clap(long)]
+        limit: Option<u64>,
+        /// Offset
+        #[clap(long)]
+        offset: Option<u64>,
+    },
+    /// Show block metadata and transaction hashes within the block
+    ShowBlock {
+        /// Height of the block to show
+        height: i64,
+    },
 }
 
-pub(crate) async fn go(Opt { sub }: Opt, cosmos: Cosmos) -> Result<()> {
+pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
     match sub {
         Subcommand::FirstBlockAfter {
             timestamp,
             earliest,
-        } => first_block_after(cosmos, timestamp, earliest).await,
-        Subcommand::AccountInfo { address } => account_info(cosmos, address).await,
-        Subcommand::CodeIdFromTx { txhash } => code_id_from_tx(cosmos, txhash).await,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            first_block_after(cosmos, timestamp, earliest).await?;
+        }
+        Subcommand::AccountInfo { address } => {
+            let cosmos = opt.network_opt.build().await?;
+            account_info(cosmos, address).await?;
+        }
+        Subcommand::CodeIdFromTx { txhash } => {
+            let cosmos = opt.network_opt.build().await?;
+            code_id_from_tx(cosmos, txhash).await?;
+        }
         Subcommand::ContractAddressFromTx { txhash } => {
-            contract_address_from_tx(cosmos, txhash).await
+            let cosmos = opt.network_opt.build().await?;
+            contract_address_from_tx(cosmos, txhash).await?;
         }
         Subcommand::ArchiveCheck {
             start_block,
             end_block,
-        } => archive_check(cosmos, start_block, end_block).await,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            archive_check(cosmos, start_block, end_block).await?;
+        }
         Subcommand::BlockGasReport {
             start_block,
             end_block,
             dest,
-        } => block_gas_report(cosmos, start_block, end_block, &dest).await,
-        Subcommand::Latest {} => latest(cosmos).await,
-        Subcommand::Epoch {} => epoch(cosmos).await,
-        Subcommand::TxFees {} => txfees(cosmos).await,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            block_gas_report(cosmos, start_block, end_block, &dest).await?;
+        }
+        Subcommand::Latest {} => latest(opt.network_opt.build().await?).await?,
+        Subcommand::Epoch {} => epoch(opt.network_opt.build().await?).await?,
+        Subcommand::TxFees {} => txfees(opt.network_opt.build().await?).await?,
+        Subcommand::ShowConfig {} => {
+            let cosmos = opt.network_opt.into_builder().await?;
+            println!("{:#?}", cosmos);
+        }
+        Subcommand::ShowTx {
+            txhash,
+            complete,
+            pretty,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            let TxResponse {
+                height,
+                txhash: _,
+                codespace,
+                code,
+                data,
+                raw_log,
+                logs,
+                info,
+                gas_wanted,
+                gas_used,
+                tx,
+                timestamp,
+                events,
+            } = cosmos.get_transaction_body(txhash).await?.1;
+            println!("Height: {height}");
+            println!("Code: {code}");
+            println!("Codespace: {codespace}");
+            if pretty {
+                match serde_json::from_str::<serde_json::Value>(&raw_log) {
+                    Err(_) => println!("Raw log is not JSON: {raw_log}"),
+                    Ok(raw_log) => serde_json::to_writer_pretty(std::io::stdout(), &raw_log)?,
+                }
+            } else {
+                println!("Raw log: {raw_log}");
+            }
+            println!("Info: {info}");
+            println!("Gas wanted: {gas_wanted}");
+            println!("Gas used: {gas_used}");
+            println!("Timestamp: {timestamp}");
+            if complete {
+                println!("Data: {data}");
+                for (idx, log) in logs.into_iter().enumerate() {
+                    println!("Log #{idx}: {log:?}");
+                }
+                for (idx, event) in events.into_iter().enumerate() {
+                    println!("Event #{idx}: {event:?}");
+                }
+            }
+            if let Some(tx) = tx {
+                println!("Encoded length: {}", tx.encoded_len());
+            }
+        }
+        Subcommand::ListTxsFor {
+            address,
+            limit,
+            offset,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            for txhash in cosmos.list_transactions_for(address, limit, offset).await? {
+                println!("{txhash}");
+            }
+        }
+        Subcommand::ShowBlock { height } => {
+            let cosmos = opt.network_opt.build().await?;
+            let BlockInfo {
+                height,
+                timestamp,
+                txhashes,
+                block_hash,
+                chain_id,
+            } = cosmos.get_block_info(height).await?;
+            println!("Chain ID: {chain_id}");
+            println!("Height: {height}");
+            println!("Timestamp: {timestamp}");
+            println!("Block hash: {block_hash}");
+            for (idx, txhash) in txhashes.into_iter().enumerate() {
+                println!("Transaction #{}: {txhash}", idx + 1);
+            }
+        }
     }
+
+    Ok(())
 }
 
 async fn first_block_after(
