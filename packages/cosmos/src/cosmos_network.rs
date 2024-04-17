@@ -1,6 +1,7 @@
-use std::{fmt::Display, str::FromStr};
+use std::str::FromStr;
 
 use serde::de::Visitor;
+use strum_macros::{EnumString, IntoStaticStr};
 
 use crate::{error::BuilderError, gas_price::GasPriceMethod, Cosmos, CosmosBuilder, HasAddressHrp};
 
@@ -11,7 +12,20 @@ use crate::{error::BuilderError, gas_price::GasPriceMethod, Cosmos, CosmosBuilde
 /// the library.
 ///
 /// Generally you'll want to use either [CosmosNetwork::builder] or [CosmosNetwork::connect].
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    EnumString,
+    IntoStaticStr,
+    strum_macros::Display,
+)]
+#[strum(serialize_all = "kebab-case")]
 #[allow(missing_docs)]
 pub enum CosmosNetwork {
     JunoTestnet,
@@ -271,6 +285,12 @@ impl CosmosNetwork {
             }
         }
     }
+
+    /// Returns the string represenation for that network.
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        self.into()
+    }
 }
 
 async fn load_json<T>(url: &str, client: &reqwest::Client) -> Result<T, BuilderError>
@@ -325,60 +345,5 @@ impl<'de> Visitor<'de> for CosmosNetworkVisitor {
         E: serde::de::Error,
     {
         CosmosNetwork::from_str(v).map_err(E::custom)
-    }
-}
-
-impl CosmosNetwork {
-    fn as_str(self) -> &'static str {
-        match self {
-            CosmosNetwork::JunoTestnet => "juno-testnet",
-            CosmosNetwork::JunoMainnet => "juno-mainnet",
-            CosmosNetwork::JunoLocal => "juno-local",
-            CosmosNetwork::OsmosisMainnet => "osmosis-mainnet",
-            CosmosNetwork::OsmosisTestnet => "osmosis-testnet",
-            CosmosNetwork::OsmosisLocal => "osmosis-local",
-            CosmosNetwork::WasmdLocal => "wasmd-local",
-            CosmosNetwork::SeiMainnet => "sei-mainnet",
-            CosmosNetwork::SeiTestnet => "sei-testnet",
-            CosmosNetwork::StargazeTestnet => "stargaze-testnet",
-            CosmosNetwork::StargazeMainnet => "stargaze-mainnet",
-            CosmosNetwork::InjectiveTestnet => "injective-testnet",
-            CosmosNetwork::InjectiveMainnet => "injective-mainnet",
-            CosmosNetwork::NeutronMainnet => "neutron-mainnet",
-            CosmosNetwork::NeutronTestnet => "neutron-testnet",
-        }
-    }
-}
-
-impl Display for CosmosNetwork {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for CosmosNetwork {
-    type Err = BuilderError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "juno-testnet" => Ok(CosmosNetwork::JunoTestnet),
-            "juno-mainnet" => Ok(CosmosNetwork::JunoMainnet),
-            "juno-local" => Ok(CosmosNetwork::JunoLocal),
-            "osmosis-mainnet" => Ok(CosmosNetwork::OsmosisMainnet),
-            "osmosis-testnet" => Ok(CosmosNetwork::OsmosisTestnet),
-            "osmosis-local" => Ok(CosmosNetwork::OsmosisLocal),
-            "wasmd-local" => Ok(CosmosNetwork::WasmdLocal),
-            "sei-mainnet" => Ok(CosmosNetwork::SeiMainnet),
-            "sei-testnet" => Ok(CosmosNetwork::SeiTestnet),
-            "stargaze-testnet" => Ok(CosmosNetwork::StargazeTestnet),
-            "stargaze-mainnet" => Ok(CosmosNetwork::StargazeMainnet),
-            "injective-testnet" => Ok(CosmosNetwork::InjectiveTestnet),
-            "injective-mainnet" => Ok(CosmosNetwork::InjectiveMainnet),
-            "neutron-mainnet" => Ok(CosmosNetwork::NeutronMainnet),
-            "neutron-testnet" => Ok(CosmosNetwork::NeutronTestnet),
-            _ => Err(BuilderError::UnknownCosmosNetwork {
-                network: s.to_owned(),
-            }),
-        }
     }
 }
