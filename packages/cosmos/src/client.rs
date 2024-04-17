@@ -452,7 +452,10 @@ impl Cosmos {
             }
         };
         let new_height = match new_height.to_str() {
-            Ok(new_height) => new_height,
+            Ok(new_height) => {
+                tracing::debug!("x-cosmos-block-height value is: {new_height}");
+                new_height
+            }
             Err(err) => {
                 tracing::warn!("x-cosmos-block-height response header from {grpc_url} does not contain textual data: {err}");
                 return Ok(());
