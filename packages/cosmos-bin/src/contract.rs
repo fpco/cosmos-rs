@@ -12,9 +12,6 @@ use crate::{cli::TxOpt, parsed_coin::ParsedCoin};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
-    /// Smart contract address
-    #[clap(long, env = "CONTRACT")]
-    contract: Address,
     #[clap(subcommand)]
     subcommand: Subcommand,
 }
@@ -23,6 +20,9 @@ pub(crate) struct Opt {
 enum Subcommand {
     /// Update the administrator on a contract
     UpdateAdmin {
+        /// Smart contract address
+        #[clap(long, env = "CONTRACT")]
+        contract: Address,
         #[clap(long)]
         new_admin: Address,
         #[clap(flatten)]
@@ -30,6 +30,9 @@ enum Subcommand {
     },
     /// Simulate migrating a contract, but don't actually do it
     SimulateMigrate {
+        /// Smart contract address
+        #[clap(long, env = "CONTRACT")]
+        contract: Address,
         #[clap(long, env = "COSMOS_SENDER")]
         sender: Address,
         /// Memo to put on transaction
@@ -132,15 +135,13 @@ enum Subcommand {
     },
 }
 
-pub(crate) async fn go(
-    Opt {
-        contract,
-        subcommand,
-    }: Opt,
-    cosmos: Cosmos,
-) -> Result<()> {
+pub(crate) async fn go(Opt { subcommand }: Opt, cosmos: Cosmos) -> Result<()> {
     match subcommand {
-        Subcommand::UpdateAdmin { new_admin, tx_opt } => {
+        Subcommand::UpdateAdmin {
+            new_admin,
+            tx_opt,
+            contract,
+        } => {
             let wallet = tx_opt.get_wallet(cosmos.get_address_hrp())?;
             TxBuilder::default()
                 .add_update_contract_admin(contract, &wallet, new_admin)
@@ -152,6 +153,7 @@ pub(crate) async fn go(
             memo,
             msg,
             code_id,
+            contract,
         } => {
             let mut txbuilder = TxBuilder::default();
             if let Some(memo) = memo {
