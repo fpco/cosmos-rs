@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use serde::de::Visitor;
 use strum_macros::{EnumString, IntoStaticStr};
@@ -188,13 +188,13 @@ impl CosmosNetwork {
                 builder.set_gas_price_retry_attempts(Some(12));
             }
             CosmosNetwork::SeiMainnet => {
-                // https://raw.githubusercontent.com/sei-protocol/chain-registry/master/gas.json
-                builder.set_gas_price(0.1, 0.2);
+                // https://github.com/sei-protocol/chain-registry/blob/main/gas.json
+                builder.set_gas_price(0.02, 0.2);
                 builder.set_gas_price_retry_attempts(Some(6));
             }
             CosmosNetwork::SeiTestnet => {
-                // https://raw.githubusercontent.com/sei-protocol/testnet-registry/master/gas.json
-                builder.set_gas_price(0.1, 0.2);
+                // https://github.com/sei-protocol/chain-registry/blob/main/gas.json
+                builder.set_gas_price(0.08, 0.8);
                 builder.set_gas_price_retry_attempts(Some(6));
             }
             CosmosNetwork::JunoLocal | CosmosNetwork::WasmdLocal | CosmosNetwork::OsmosisLocal => {
@@ -238,49 +238,15 @@ impl CosmosNetwork {
                 Ok(())
             }
             CosmosNetwork::SeiMainnet => {
-                #[derive(serde::Deserialize)]
-                struct SeiGasConfig {
-                    #[serde(rename = "pacific-1")]
-                    pub pacific_1: SeiGasConfigItem,
-                }
-                #[derive(serde::Deserialize)]
-                struct SeiGasConfigItem {
-                    pub min_gas_price: f64,
-                }
+                let min_gas_price = get_sei_min_gas_price(client, "pacific-1").await?;
 
-                let gas_config = load_json::<SeiGasConfig>(
-                    "https://raw.githubusercontent.com/sei-protocol/chain-registry/master/gas.json",
-                    client,
-                )
-                .await?;
-
-                builder.set_gas_price(
-                    gas_config.pacific_1.min_gas_price,
-                    gas_config.pacific_1.min_gas_price * 2.0,
-                );
+                builder.set_gas_price(min_gas_price, min_gas_price * 10.0);
                 Ok(())
             }
             CosmosNetwork::SeiTestnet => {
-                #[derive(serde::Deserialize)]
-                struct SeiGasConfig {
-                    #[serde(rename = "atlantic-2")]
-                    pub atlantic_2: SeiGasConfigItem,
-                }
-                #[derive(serde::Deserialize)]
-                struct SeiGasConfigItem {
-                    pub min_gas_price: f64,
-                }
+                let min_gas_price = get_sei_min_gas_price(client, "atlantic-2").await?;
 
-                let gas_config = load_json::<SeiGasConfig>(
-                "https://raw.githubusercontent.com/sei-protocol/testnet-registry/master/gas.json",
-                    client,
-                )
-                .await?;
-
-                builder.set_gas_price(
-                    gas_config.atlantic_2.min_gas_price,
-                    gas_config.atlantic_2.min_gas_price * 2.0,
-                );
+                builder.set_gas_price(min_gas_price, min_gas_price * 10.0);
                 Ok(())
             }
         }
@@ -291,6 +257,28 @@ impl CosmosNetwork {
     pub fn as_str(&self) -> &'static str {
         self.into()
     }
+}
+
+async fn get_sei_min_gas_price(
+    client: &reqwest::Client,
+    chain_id: &str,
+) -> Result<f64, BuilderError> {
+    #[derive(serde::Deserialize, Debug)]
+    struct SeiGasConfigItem {
+        pub min_gas_price: f64,
+    }
+
+    const URL: &str = "https://raw.githubusercontent.com/sei-protocol/chain-registry/main/gas.json";
+
+    let configs = load_json::<HashMap<String, SeiGasConfigItem>>(URL, client).await?;
+
+    configs
+        .get(chain_id)
+        .map(|config| config.min_gas_price)
+        .ok_or_else(|| BuilderError::SeiGasConfigNotFound {
+            chain_id: chain_id.to_owned(),
+            url: URL.to_owned(),
+        })
 }
 
 async fn load_json<T>(url: &str, client: &reqwest::Client) -> Result<T, BuilderError>

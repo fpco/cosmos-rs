@@ -91,6 +91,8 @@ pub enum BuilderError {
     },
     #[error(transparent)]
     SanityQueryFailed { source: QueryError },
+    #[error("Could not find Sei gas config for chain ID {chain_id} at {url}")]
+    SeiGasConfigNotFound { chain_id: String, url: String },
 }
 
 /// Parse errors while interacting with chain data.
