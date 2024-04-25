@@ -202,9 +202,10 @@ pub enum Error {
         path: PathBuf,
         source: std::io::Error,
     },
-    #[error("Transaction failed ({grpc_url}) during {stage} with {code} and log: {raw_log}. Action: {action}.")]
+    #[error("Transaction {txhash} failed (on {grpc_url}) during {stage} with {code} and log: {raw_log}. Action: {action}.")]
     TransactionFailed {
         code: CosmosSdkError,
+        txhash: String,
         raw_log: String,
         action: Arc<Action>,
         grpc_url: Arc<String>,

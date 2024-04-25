@@ -1516,6 +1516,7 @@ impl TxBuilder {
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
                     code: res.code.into(),
+                    txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
                     action: Action::Broadcast(self.clone()).into(),
                     grpc_url,
@@ -1531,6 +1532,7 @@ impl TxBuilder {
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
                     code: res.code.into(),
+                    txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
                     action: Action::Broadcast(self.clone()).into(),
                     grpc_url,
@@ -1555,13 +1557,14 @@ impl TxBuilder {
             match retry_with_price(amount).await {
                 Err(crate::Error::TransactionFailed {
                     code: CosmosSdkError::InsufficientFee,
+                    txhash,
                     raw_log,
                     action: _,
                     grpc_url: _,
                     stage: _,
                 }) => {
                     tracing::debug!(
-                        "Insufficient gas in attempt #{}, retrying. Raw log: {raw_log}",
+                        "Insufficient gas in attempt #{}, retrying {txhash}. Raw log: {raw_log}",
                         attempt_number + 1
                     );
                 }
