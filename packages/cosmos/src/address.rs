@@ -6,7 +6,7 @@ use std::{
 };
 
 use bech32::{FromBase32, ToBase32};
-use bitcoin::util::bip32::DerivationPath;
+use bitcoin::bip32::DerivationPath;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use serde::de::Visitor;

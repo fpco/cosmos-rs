@@ -4,7 +4,7 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use bip39::Mnemonic;
-use bitcoin::util::bip32::DerivationPath;
+use bitcoin::bip32::DerivationPath;
 use chrono::{DateTime, Utc};
 use http::uri::InvalidUri;
 
@@ -46,11 +46,11 @@ pub enum AddressError {
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum WalletError {
     #[error("Could not get root private key from mnemonic: {source:?}")]
-    CouldNotGetRootPrivateKey { source: bitcoin::util::bip32::Error },
+    CouldNotGetRootPrivateKey { source: bitcoin::bip32::Error },
     #[error("Could not derive private key using derivation path {derivation_path}: {source:?}")]
     CouldNotDerivePrivateKey {
         derivation_path: Arc<DerivationPath>,
-        source: bitcoin::util::bip32::Error,
+        source: bitcoin::bip32::Error,
     },
     #[error("Invalid derivation path {path:?}: {source:?}")]
     InvalidDerivationPath {
