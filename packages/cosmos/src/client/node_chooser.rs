@@ -33,7 +33,6 @@ impl NodeChooser {
 
     pub(super) fn choose_node(&self) -> Result<&Node, ConnectionError> {
         let primary_health = self.primary.is_healthy(self.allowed_error_count);
-        println!("{primary_health:?}");
         if primary_health.is_healthy() {
             Ok(&self.primary)
         } else {
