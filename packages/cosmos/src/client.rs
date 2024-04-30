@@ -888,19 +888,15 @@ impl Cosmos {
         &self,
         address: Address,
         limit: Option<u64>,
-        offset: Option<u64>,
+        page: Option<u64>,
     ) -> Result<Vec<String>, QueryError> {
         self.perform_query(
             GetTxsEventRequest {
                 events: vec![format!("message.sender='{address}'")],
-                pagination: Some(PageRequest {
-                    key: vec![],
-                    offset: offset.unwrap_or_default(),
-                    limit: limit.unwrap_or(10),
-                    count_total: false,
-                    reverse: false,
-                }),
+                pagination: None,
                 order_by: OrderBy::Asc as i32,
+                page: page.unwrap_or(1),
+                limit: limit.unwrap_or(10),
             },
             Action::ListTransactionsFor(address),
             true,
@@ -938,7 +934,7 @@ impl Cosmos {
             .perform_query(GetBlockByHeightRequest { height }, action.clone(), true)
             .await?
             .into_inner();
-        BlockInfo::new(action, res.block_id, res.block, Some(height))
+        BlockInfo::new(action, res.block_id, res.sdk_block, Some(height))
     }
 
     /// Same as [Self::get_transaction_with_fallbacks] but for [Self::get_block_info]
@@ -952,7 +948,7 @@ impl Cosmos {
             .await
             .map(|x| x.into_inner());
         match res {
-            Ok(res) => BlockInfo::new(action, res.block_id, res.block, Some(height)),
+            Ok(res) => BlockInfo::new(action, res.block_id, res.sdk_block, Some(height)),
             Err(e) => {
                 for node in self.pool.node_chooser.all_nodes() {
                     if let Ok(mut node_guard) = self.pool.get_with_node(node).await {
@@ -964,7 +960,7 @@ impl Cosmos {
                             .await
                         {
                             let res = res.into_inner();
-                            return BlockInfo::new(action, res.block_id, res.block, Some(height));
+                            return BlockInfo::new(action, res.block_id, res.sdk_block, Some(height));
                         }
                     }
                 }
@@ -995,7 +991,7 @@ impl Cosmos {
             .perform_query(GetLatestBlockRequest {}, action.clone(), true)
             .await?
             .into_inner();
-        BlockInfo::new(action, res.block_id, res.block, None)
+        BlockInfo::new(action, res.block_id, res.sdk_block, None)
     }
 
     /// Get the most recently seen block height.
@@ -1102,8 +1098,8 @@ pub struct BlockInfo {
 impl BlockInfo {
     fn new(
         action: Action,
-        block_id: Option<cosmos_sdk_proto::tendermint::types::BlockId>,
-        block: Option<cosmos_sdk_proto::tendermint::types::Block>,
+        block_id: Option<tendermint_proto::v0_34::types::BlockId>,
+        block: Option<cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::Block>,
         height: Option<i64>,
     ) -> Result<BlockInfo, crate::Error> {
         (|| {
@@ -1398,6 +1394,7 @@ impl TxBuilder {
                     .iter()
                     .map(|sequence| self.make_signer_info(*sequence, None))
                     .collect(),
+                tip: None,
             }),
             signatures: sequences.iter().map(|_| vec![]).collect(),
             body: Some(body.clone()),
@@ -1482,6 +1479,7 @@ impl TxBuilder {
                     payer: "".to_owned(),
                     granter: "".to_owned(),
                 }),
+                tip: None,
             };
 
             let sign_doc = SignDoc {

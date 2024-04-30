@@ -358,7 +358,7 @@ pub enum QueryErrorDetails {
     #[error("Error querying server, received HTTP status code {status}. {source:?}")]
     Unavailable {
         source: tonic::Status,
-        status: reqwest::StatusCode,
+        status: http::status::StatusCode,
     },
     #[error("Server does not implement expected services, it may not be a Cosmos gRPC endpoint. {source}")]
     Unimplemented { source: tonic::Status },
