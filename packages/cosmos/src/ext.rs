@@ -57,6 +57,21 @@ impl TxResponseExt for TxResponse {
             }
         }
 
+        addrs.extend(
+            self.events
+                .iter()
+                .filter(|event| event.r#type == "instantiate")
+                .flat_map(|event| event.attributes.iter())
+                .filter(|attr| {
+                    &*attr.key == b"_contract_address" || &*attr.key == b"contract_address"
+                })
+                .flat_map(|attr| {
+                    std::str::from_utf8(&attr.value)
+                        .ok()
+                        .and_then(|s| s.parse::<Address>().ok())
+                }),
+        );
+
         Ok(addrs)
     }
 
@@ -89,6 +104,19 @@ impl TxResponseExt for TxResponse {
                 }
             }
         }
+
+        res.extend(
+            self.events
+                .iter()
+                .filter(|event| event.r#type == "store_code")
+                .flat_map(|event| event.attributes.iter())
+                .filter(|attr| &*attr.key == b"code_id")
+                .flat_map(|attr| {
+                    std::str::from_utf8(&attr.value)
+                        .ok()
+                        .and_then(|s| s.parse::<u64>().ok())
+                }),
+        );
 
         Ok(res)
     }
