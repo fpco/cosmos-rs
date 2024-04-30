@@ -3,7 +3,7 @@ use std::sync::Arc;
 use rand::seq::SliceRandom;
 
 use crate::{
-    error::{Action, BuilderError, NodeHealthReport, QueryErrorDetails},
+    error::{Action, BuilderError, ConnectionError, NodeHealthReport, QueryErrorDetails},
     CosmosBuilder,
 };
 
@@ -31,21 +31,26 @@ impl NodeChooser {
         })
     }
 
-    pub(super) fn choose_node(&self) -> &Node {
-        if self.primary.is_healthy(self.allowed_error_count) {
-            &self.primary
+    pub(super) fn choose_node(&self) -> Result<&Node, ConnectionError> {
+        let primary_health = self.primary.is_healthy(self.allowed_error_count);
+        println!("{primary_health:?}");
+        if primary_health.is_healthy() {
+            Ok(&self.primary)
         } else {
             let fallbacks = self
                 .fallbacks
                 .iter()
-                .filter(|node| node.is_healthy(self.allowed_error_count))
+                .filter(|node| node.is_healthy(self.allowed_error_count).is_healthy())
                 .collect::<Vec<_>>();
+
             let mut rng = rand::thread_rng();
-            fallbacks
-                .as_slice()
-                .choose(&mut rng)
-                .copied()
-                .unwrap_or(&self.primary)
+            if let Some(node) = fallbacks.as_slice().choose(&mut rng) {
+                Ok(*node)
+            } else if primary_health.is_blocked() {
+                Err(ConnectionError::NoHealthyFound)
+            } else {
+                Ok(&self.primary)
+            }
         }
     }
 
