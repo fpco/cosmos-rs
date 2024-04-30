@@ -47,7 +47,7 @@ impl Pool {
             .await
             .expect("Pool::get: semaphore has been closed");
 
-        let node = self.node_chooser.choose_node();
+        let node = self.node_chooser.choose_node()?;
         Ok(NodeGuard {
             inner: node.clone(),
             _permit: permit,

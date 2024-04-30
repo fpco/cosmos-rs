@@ -380,7 +380,7 @@ impl Cosmos {
                 let can_retry = match err.error_category() {
                     QueryErrorCategory::NetworkIssue => {
                         cosmos_inner
-                            .set_broken(|grpc_url| ConnectionError::QueryFailed { grpc_url });
+                            .set_broken(|grpc_url| ConnectionError::QueryFailed { grpc_url }, &err);
                         true
                     }
                     QueryErrorCategory::ConnectionIsFine => false,
@@ -402,12 +402,13 @@ impl Cosmos {
                                 // Something went wrong. Don't even bother
                                 // looking at _what_ went wrong, just kill this
                                 // connection and retry.
-                                cosmos_inner.set_broken(|grpc_url| {
-                                    ConnectionError::SanityCheckFailed {
+                                cosmos_inner.set_broken(
+                                    |grpc_url| ConnectionError::SanityCheckFailed {
                                         grpc_url,
                                         source: status,
-                                    }
-                                });
+                                    },
+                                    &err,
+                                );
                                 true
                             }
                         }
@@ -417,8 +418,10 @@ impl Cosmos {
                 Err((err, can_retry))
             }
             Err(_) => {
-                cosmos_inner.set_broken(|grpc_url| ConnectionError::TimeoutQuery { grpc_url });
-                Err((QueryErrorDetails::QueryTimeout(duration), true))
+                let err = QueryErrorDetails::QueryTimeout(duration);
+                cosmos_inner
+                    .set_broken(|grpc_url| ConnectionError::TimeoutQuery { grpc_url }, &err);
+                Err((err, true))
             }
         }
     }

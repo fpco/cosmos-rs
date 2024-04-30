@@ -143,6 +143,8 @@ pub enum ConnectionError {
     TimeoutQuery { grpc_url: Arc<String> },
     #[error("Timeout hit when connecting to gRPC endpoint {grpc_url}")]
     TimeoutConnecting { grpc_url: Arc<String> },
+    #[error("No healthy nodes found")]
+    NoHealthyFound,
 }
 
 /// Error while parsing a [crate::ContractAdmin].
@@ -377,6 +379,10 @@ pub enum QueryErrorDetails {
     },
     #[error("Account sequence mismatch: {0}")]
     AccountSequenceMismatch(tonic::Status),
+    #[error("You appear to be rate limited by the gRPC server: {source:?}")]
+    RateLimited { source: tonic::Status },
+    #[error("The gRPC server is returning a 'forbidden' response: {source:?}")]
+    Forbidden { source: tonic::Status },
 }
 
 /// Different known Cosmos SDK error codes
@@ -491,6 +497,8 @@ impl QueryErrorDetails {
             QueryErrorDetails::NoNewBlockFound { .. } => NetworkIssue,
             // Same logic as CosmosSdk IncorrectAccountSequence above
             QueryErrorDetails::AccountSequenceMismatch { .. } => ConnectionIsFine,
+            QueryErrorDetails::RateLimited { .. } => NetworkIssue,
+            QueryErrorDetails::Forbidden { .. } => NetworkIssue,
         }
     }
 
@@ -542,6 +550,13 @@ impl QueryErrorDetails {
             return QueryErrorDetails::AccountSequenceMismatch(err);
         }
 
+        if err.message().contains("status: 429") {
+            return QueryErrorDetails::RateLimited { source: err };
+        }
+        if err.message().contains("status: 403") {
+            return QueryErrorDetails::Forbidden { source: err };
+        }
+
         if let Some(lowest_height) = get_lowest_height(err.message()) {
             return QueryErrorDetails::HeightNotAvailable {
                 lowest_height: Some(lowest_height),
@@ -550,6 +565,26 @@ impl QueryErrorDetails {
         }
 
         QueryErrorDetails::Unknown(err)
+    }
+
+    pub(crate) fn is_blocked(&self) -> bool {
+        match self {
+            QueryErrorDetails::Unknown(_)
+            | QueryErrorDetails::QueryTimeout(_)
+            | QueryErrorDetails::ConnectionError(_)
+            | QueryErrorDetails::NotFound(_)
+            | QueryErrorDetails::CosmosSdk { .. }
+            | QueryErrorDetails::JsonParseError(_)
+            | QueryErrorDetails::FailedToExecute(_)
+            | QueryErrorDetails::HeightNotAvailable { .. }
+            | QueryErrorDetails::Unavailable { .. }
+            | QueryErrorDetails::Unimplemented { .. }
+            | QueryErrorDetails::TransportError { .. }
+            | QueryErrorDetails::BlocksLagDetected { .. }
+            | QueryErrorDetails::NoNewBlockFound { .. }
+            | QueryErrorDetails::AccountSequenceMismatch(_) => false,
+            QueryErrorDetails::RateLimited { .. } | QueryErrorDetails::Forbidden { .. } => true,
+        }
     }
 }
 

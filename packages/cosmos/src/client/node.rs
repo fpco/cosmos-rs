@@ -13,7 +13,10 @@ use tonic::{
 };
 
 use crate::{
-    error::{Action, BuilderError, ConnectionError, LastNodeError, SingleNodeHealthReport},
+    error::{
+        Action, BuilderError, ConnectionError, LastNodeError, QueryErrorDetails,
+        SingleNodeHealthReport,
+    },
     Address, CosmosBuilder,
 };
 
@@ -60,13 +63,29 @@ struct LastError {
     ///
     /// Gets reset each time there's a successful query, or a query that fails with a non-network reason.
     error_count: usize,
+    /// Does this error deserve blocking the node entirely?
+    blocked: bool,
 }
 
 impl LastError {
-    fn is_healthy(&self, allowed_error_count: usize) -> bool {
+    fn is_healthy(&self, allowed_error_count: usize) -> NodeHealthLevel {
         const NODE_ERROR_TIMEOUT: u64 = 30;
-        self.instant.elapsed().as_secs() > NODE_ERROR_TIMEOUT
-            || self.error_count <= allowed_error_count
+
+        // If enough time has passed since the error, ignore it.
+        if self.instant.elapsed().as_secs() > NODE_ERROR_TIMEOUT {
+            NodeHealthLevel::Healthy
+        }
+        // If the error is a blocking error, we don't allow even a single error
+        // through. Check that first.
+        else if self.blocked {
+            NodeHealthLevel::Blocked
+        }
+        // If there are enough errors mark as unhealthy
+        else if self.error_count > allowed_error_count {
+            NodeHealthLevel::Unhealthy
+        } else {
+            NodeHealthLevel::Healthy
+        }
     }
 }
 
@@ -145,18 +164,23 @@ impl Node {
         &self.node_inner.broadcast_sequences
     }
 
-    pub(crate) fn set_broken(&mut self, err: impl FnOnce(Arc<String>) -> ConnectionError) {
+    pub(crate) fn set_broken(
+        &mut self,
+        err: impl FnOnce(Arc<String>) -> ConnectionError,
+        details: &QueryErrorDetails,
+    ) {
         let err = err(self.node_inner.grpc_url.clone());
-        self.log_connection_error(err);
+        self.log_connection_error(err, details);
     }
 
-    pub(super) fn log_connection_error(&self, error: ConnectionError) {
+    pub(super) fn log_connection_error(&self, error: ConnectionError, details: &QueryErrorDetails) {
         *self.node_inner.last_error.write() = Some(LastError {
             error: error.to_string().into(),
             instant: Instant::now(),
             timestamp: Utc::now(),
             action: None,
             error_count: 1,
+            blocked: details.is_blocked(),
         });
     }
 
@@ -177,14 +201,15 @@ impl Node {
                     timestamp: Utc::now(),
                     action: Some(action),
                     error_count: old_error_count + 1,
+                    blocked: err.is_blocked(),
                 });
             }
         }
     }
 
-    pub(crate) fn is_healthy(&self, allowed_error_count: usize) -> bool {
+    pub(crate) fn is_healthy(&self, allowed_error_count: usize) -> NodeHealthLevel {
         match &*self.node_inner.last_error.read() {
-            None => true,
+            None => NodeHealthLevel::Healthy,
             Some(last_error) => last_error.is_healthy(allowed_error_count),
         }
     }
@@ -200,7 +225,7 @@ impl Node {
             grpc_url: self.node_inner.grpc_url.clone(),
             is_fallback: self.node_inner.is_fallback,
             is_healthy: last_error.as_ref().map_or(true, |last_error| {
-                last_error.is_healthy(allowed_error_count)
+                last_error.is_healthy(allowed_error_count).is_healthy()
             }),
             error_count: last_error.map_or(0, |last_error| last_error.error_count),
             last_error: last_error.map(|last_error| {
@@ -283,5 +308,30 @@ impl Node {
         &self,
     ) -> crate::osmosis::txfees::query_client::QueryClient<CosmosChannel> {
         crate::osmosis::txfees::query_client::QueryClient::new(self.node_inner.channel.clone())
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum NodeHealthLevel {
+    /// Fully healthy node, feel free to use it
+    Healthy,
+    /// Unhealthy, prefer others
+    Unhealthy,
+    /// Do not use at all, such as during rate limiting
+    Blocked,
+}
+impl NodeHealthLevel {
+    pub(crate) fn is_healthy(&self) -> bool {
+        match self {
+            NodeHealthLevel::Healthy => true,
+            NodeHealthLevel::Unhealthy | NodeHealthLevel::Blocked => false,
+        }
+    }
+
+    pub(crate) fn is_blocked(&self) -> bool {
+        match self {
+            NodeHealthLevel::Healthy | NodeHealthLevel::Unhealthy => false,
+            NodeHealthLevel::Blocked => true,
+        }
     }
 }
