@@ -3,7 +3,7 @@ use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, ContractAdmin, Cosmos, HasAddress,
     HasAddressHrp, TxBuilder,
 };
-use cosmwasm_std::{to_binary, CosmosMsg, Decimal, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Decimal, Empty, WasmMsg};
 use cw3::{ProposalListResponse, ProposalResponse};
 use cw4::Member;
 use cw_utils::Threshold;
@@ -229,7 +229,7 @@ async fn update_members_message(
     };
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: group.get_address_string(),
-        msg: to_binary(&msg)?,
+        msg: to_json_binary(&msg)?,
         funds: vec![],
     });
     println!("{}", serde_json::to_string(&msg)?);
@@ -417,7 +417,7 @@ fn wasm_execute_message(
     let msg = serde_json::from_str::<serde_json::Value>(&message)?;
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: contract.get_address_string(),
-        msg: to_binary(&msg)?,
+        msg: to_json_binary(&msg)?,
         funds: vec![],
     });
     println!("{}", serde_json::to_string(&msg)?);
@@ -448,7 +448,7 @@ fn migrate_contract_message(
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Migrate {
         contract_addr: contract.get_address_string(),
         new_code_id: code_id,
-        msg: to_binary(&message)?,
+        msg: to_json_binary(&message)?,
     });
     println!("{}", serde_json::to_string(&msg)?);
     Ok(())
