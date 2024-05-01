@@ -3,10 +3,10 @@ use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{ripemd160, sha256, Hash};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{All, Message, Secp256k1};
-use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
