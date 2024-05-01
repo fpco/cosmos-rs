@@ -20,7 +20,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 regex = "1"
 once_cell = "1.19.0"
 fs-err = "2"
-base64 = "0.22.0"
+base64 = "0.22.1"
 cw3 = "1"
 cw3-flex-multisig = "1"
 cw4 = "1"
