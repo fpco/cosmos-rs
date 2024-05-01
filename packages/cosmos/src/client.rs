@@ -890,25 +890,25 @@ impl Cosmos {
         limit: Option<u64>,
         page: Option<u64>,
     ) -> Result<Vec<String>, QueryError> {
-        self.perform_query(
-            GetTxsEventRequest {
-                events: vec![format!("message.sender='{address}'")],
-                pagination: None,
-                order_by: OrderBy::Asc as i32,
-                page: page.unwrap_or(1),
-                limit: limit.unwrap_or(10),
-            },
-            Action::ListTransactionsFor(address),
-            true,
-        )
-        .await
-        .map(|x| {
-            x.into_inner()
-                .tx_responses
-                .into_iter()
-                .map(|x| x.txhash)
-                .collect()
-        })
+        // The pagination field within this struct is
+        // deprecated. https://docs.rs/cosmos-sdk-proto/0.21.1/cosmos_sdk_proto/cosmos/tx/v1beta1/struct.GetTxsEventRequest.html#structfield.pagination
+        #[allow(deprecated)]
+        let req = GetTxsEventRequest {
+            events: vec![format!("message.sender='{address}'")],
+            pagination: None,
+            order_by: OrderBy::Asc as i32,
+            page: page.unwrap_or(1),
+            limit: limit.unwrap_or(10),
+        };
+        self.perform_query(req, Action::ListTransactionsFor(address), true)
+            .await
+            .map(|x| {
+                x.into_inner()
+                    .tx_responses
+                    .into_iter()
+                    .map(|x| x.txhash)
+                    .collect()
+            })
     }
 
     /// attempt_number starts at 0
@@ -960,7 +960,12 @@ impl Cosmos {
                             .await
                         {
                             let res = res.into_inner();
-                            return BlockInfo::new(action, res.block_id, res.sdk_block, Some(height));
+                            return BlockInfo::new(
+                                action,
+                                res.block_id,
+                                res.sdk_block,
+                                Some(height),
+                            );
                         }
                     }
                 }
