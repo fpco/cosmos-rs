@@ -15,7 +15,7 @@ tonic = { version = "0.11.0", features = [
 cosmos-sdk-proto = { version = "0.21.1", features = ["cosmwasm"] }
 prost = "0.12.4"
 prost-types = "0.12.4"
-bech32 = "0.9.1"
+bech32 = "0.11.0"
 bitcoin = "0.32.0"
 hkd32 = { version = "0.7.0", features = ["bip39"] }
 once_cell = "1.19.0"
