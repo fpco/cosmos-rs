@@ -122,9 +122,10 @@ pub enum ChainParseError {
     NoCodeIdFound { txhash: String },
     #[error("No instantiated contract found in transaction {txhash}")]
     NoInstantiatedContractFound { txhash: String },
-
     #[error("TxFees {err}")]
     TxFees { err: String },
+    #[error("Invalid 'wei' amount (that gets converted to Decimal with 18 decimals): {err}")]
+    WeiAmount { err: String },
 }
 
 /// An error that occurs while connecting to a Cosmos gRPC endpoint.
@@ -274,6 +275,10 @@ pub enum Action {
     SanityCheck,
     OsmosisEpochsInfo,
     OsmosisTxFeesInfo,
+    SgeInflation,
+    Supply,
+    Validators,
+    Pool,
 }
 
 impl Display for Action {
@@ -302,6 +307,10 @@ impl Display for Action {
             Action::SanityCheck => f.write_str("sanity check"),
             Action::OsmosisEpochsInfo => f.write_str("get Osmosis epochs info"),
             Action::OsmosisTxFeesInfo => f.write_str("get Osmosis txfees info"),
+            Action::SgeInflation => f.write_str("get sge mint inflation"),
+            Action::Supply => f.write_str("get cosmos bank total supply"),
+            Action::Validators => f.write_str("get cosmos staking validators"),
+            Action::Pool => f.write_str("get cosmos staking pool"),
         }
     }
 }

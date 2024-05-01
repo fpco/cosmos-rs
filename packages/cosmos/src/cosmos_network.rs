@@ -43,6 +43,7 @@ pub enum CosmosNetwork {
     InjectiveMainnet,
     NeutronMainnet,
     NeutronTestnet,
+    SixSigmaMainnet,
 }
 
 impl CosmosNetwork {
@@ -63,7 +64,8 @@ impl CosmosNetwork {
             | CosmosNetwork::SeiMainnet
             | CosmosNetwork::StargazeMainnet
             | CosmosNetwork::InjectiveMainnet
-            | CosmosNetwork::NeutronMainnet => true,
+            | CosmosNetwork::NeutronMainnet
+            | CosmosNetwork::SixSigmaMainnet => true,
         }
     }
 
@@ -121,6 +123,7 @@ impl CosmosNetwork {
             CosmosNetwork::InjectiveMainnet => "injective-1",
             CosmosNetwork::NeutronMainnet => "neutron-1",
             CosmosNetwork::NeutronTestnet => "pion-1",
+            CosmosNetwork::SixSigmaMainnet => "sgenet-1",
         }
     }
 
@@ -137,6 +140,7 @@ impl CosmosNetwork {
             CosmosNetwork::StargazeTestnet | CosmosNetwork::StargazeMainnet => "ustars",
             CosmosNetwork::InjectiveTestnet | CosmosNetwork::InjectiveMainnet => "inj",
             CosmosNetwork::NeutronMainnet | CosmosNetwork::NeutronTestnet => "untrn",
+            CosmosNetwork::SixSigmaMainnet => "usge",
         }
     }
 
@@ -167,6 +171,7 @@ impl CosmosNetwork {
             CosmosNetwork::InjectiveMainnet => "https://sentry.chain.grpc.injective.network",
             CosmosNetwork::NeutronMainnet => "http://grpc-kralum.neutron-1.neutron.org",
             CosmosNetwork::NeutronTestnet => "http://grpc-falcron.pion-1.ntrn.tech",
+            CosmosNetwork::SixSigmaMainnet => "https://sge-grpc.polkachu.com:17790",
         }
     }
 
@@ -179,7 +184,8 @@ impl CosmosNetwork {
             | CosmosNetwork::StargazeTestnet
             | CosmosNetwork::StargazeMainnet
             | CosmosNetwork::NeutronMainnet
-            | CosmosNetwork::NeutronTestnet => (),
+            | CosmosNetwork::NeutronTestnet
+            | CosmosNetwork::SixSigmaMainnet => (),
             CosmosNetwork::OsmosisMainnet => {
                 builder.set_osmosis_mainnet_chain_paused();
                 // We need a very wide band on Osmosis gas prices due to bugs in
@@ -230,7 +236,8 @@ impl CosmosNetwork {
             | CosmosNetwork::InjectiveTestnet
             | CosmosNetwork::InjectiveMainnet
             | CosmosNetwork::NeutronMainnet
-            | CosmosNetwork::NeutronTestnet => Ok(()),
+            | CosmosNetwork::NeutronTestnet
+            | CosmosNetwork::SixSigmaMainnet => Ok(()),
             CosmosNetwork::OsmosisMainnet => {
                 builder.set_gas_price_method(
                     GasPriceMethod::new_osmosis_mainnet(builder.get_osmosis_gas_params()).await?,

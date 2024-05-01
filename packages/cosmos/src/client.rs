@@ -12,12 +12,17 @@ use chrono::{DateTime, TimeZone, Utc};
 use cosmos_sdk_proto::{
     cosmos::{
         auth::v1beta1::{BaseAccount, QueryAccountRequest},
-        bank::v1beta1::QueryAllBalancesRequest,
+        bank::v1beta1::{
+            QueryAllBalancesRequest, QueryTotalSupplyRequest, QueryTotalSupplyResponse,
+        },
         base::{
             abci::v1beta1::TxResponse,
             query::v1beta1::PageRequest,
             tendermint::v1beta1::{GetBlockByHeightRequest, GetLatestBlockRequest},
             v1beta1::Coin,
+        },
+        staking::v1beta1::{
+            QueryPoolRequest, QueryPoolResponse, QueryValidatorsRequest, QueryValidatorsResponse,
         },
         tx::v1beta1::{
             AuthInfo, BroadcastMode, BroadcastTxRequest, Fee, GetTxRequest, GetTxResponse,
@@ -41,6 +46,7 @@ use crate::{
     gas_multiplier::{GasMultiplier, GasMultiplierConfig},
     gas_price::{CurrentGasPrice, DEFAULT_GAS_PRICE},
     osmosis::ChainPausedStatus,
+    sge::mint::QueryInflationRequest,
     wallet::WalletPublicKey,
     Address, CosmosBuilder, DynamicGasMultiplier, Error, HasAddress, TxBuilder,
 };
@@ -1081,6 +1087,38 @@ impl Cosmos {
                 high = mid;
             }
         }
+    }
+
+    /// Gets the current minting inflation value
+    pub async fn inflation(&self) -> Result<Vec<u8>, crate::Error> {
+        let res = self
+            .perform_query(QueryInflationRequest {}, Action::SgeInflation, true)
+            .await?;
+        Ok(res.into_inner().inflation)
+    }
+
+    /// Supply represents a struct that passively keeps track of the total supply amounts in the network
+    pub async fn supply(&self) -> Result<QueryTotalSupplyResponse, crate::Error> {
+        let res = self
+            .perform_query(QueryTotalSupplyRequest::default(), Action::Supply, true)
+            .await?;
+        Ok(res.into_inner())
+    }
+
+    /// Gets the list of all current validators
+    pub async fn validators(&self) -> Result<QueryValidatorsResponse, crate::Error> {
+        let res = self
+            .perform_query(QueryValidatorsRequest::default(), Action::Validators, true)
+            .await?;
+        Ok(res.into_inner())
+    }
+
+    /// Tracks bonded and not bonded token supply
+    pub async fn pool(&self) -> Result<QueryPoolResponse, crate::Error> {
+        let res = self
+            .perform_query(QueryPoolRequest::default(), Action::Pool, true)
+            .await?;
+        Ok(res.into_inner())
     }
 }
 

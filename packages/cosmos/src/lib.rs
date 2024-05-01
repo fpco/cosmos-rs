@@ -37,6 +37,7 @@ pub mod error;
 pub mod gas_price;
 pub mod messages;
 pub mod osmosis;
+pub mod sge;
 
 /// A result type with our error type provided as the default.
 pub type Result<T, E = Error> = std::result::Result<T, E>;

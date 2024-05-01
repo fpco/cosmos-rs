@@ -412,6 +412,7 @@ impl HasAddressHrp for CosmosNetwork {
             CosmosNetwork::StargazeTestnet | CosmosNetwork::StargazeMainnet => "stars",
             CosmosNetwork::InjectiveTestnet | CosmosNetwork::InjectiveMainnet => "inj",
             CosmosNetwork::NeutronMainnet | CosmosNetwork::NeutronTestnet => "neutron",
+            CosmosNetwork::SixSigmaMainnet => "sge",
         })
     }
 }
@@ -522,6 +523,7 @@ mod tests {
         AddressHrp::new("osmo").unwrap();
         AddressHrp::new("btc").unwrap();
         AddressHrp::new("foobar").unwrap();
+        AddressHrp::new("sge").unwrap();
 
         // To my surprise this is actually allowed per spec
         AddressHrp::new("osmo1").unwrap();

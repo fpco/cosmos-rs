@@ -5,10 +5,16 @@ use cosmos_sdk_proto::{
             QueryGranteeGrantsRequest, QueryGranteeGrantsResponse, QueryGranterGrantsRequest,
             QueryGranterGrantsResponse,
         },
-        bank::v1beta1::{QueryAllBalancesRequest, QueryAllBalancesResponse},
+        bank::v1beta1::{
+            QueryAllBalancesRequest, QueryAllBalancesResponse, QueryTotalSupplyRequest,
+            QueryTotalSupplyResponse,
+        },
         base::tendermint::v1beta1::{
             GetBlockByHeightRequest, GetBlockByHeightResponse, GetLatestBlockRequest,
             GetLatestBlockResponse,
+        },
+        staking::v1beta1::{
+            QueryPoolRequest, QueryPoolResponse, QueryValidatorsRequest, QueryValidatorsResponse,
         },
         tx::v1beta1::{
             BroadcastTxRequest, BroadcastTxResponse, GetTxRequest, GetTxResponse,
@@ -226,5 +232,49 @@ impl GrpcRequest for QueryEipBaseFeeRequest {
         inner: &mut Node,
     ) -> Result<tonic::Response<Self::Response>, tonic::Status> {
         inner.txfees_query_client().get_eip_base_fee(req).await
+    }
+}
+
+#[async_trait]
+impl GrpcRequest for QueryTotalSupplyRequest {
+    type Response = QueryTotalSupplyResponse;
+    async fn perform(
+        req: tonic::Request<Self>,
+        inner: &mut Node,
+    ) -> Result<tonic::Response<Self::Response>, tonic::Status> {
+        inner.bank_query_client().total_supply(req).await
+    }
+}
+
+#[async_trait]
+impl GrpcRequest for QueryValidatorsRequest {
+    type Response = QueryValidatorsResponse;
+    async fn perform(
+        req: tonic::Request<Self>,
+        inner: &mut Node,
+    ) -> Result<tonic::Response<Self::Response>, tonic::Status> {
+        inner.staking_query_client().validators(req).await
+    }
+}
+
+#[async_trait]
+impl GrpcRequest for QueryPoolRequest {
+    type Response = QueryPoolResponse;
+    async fn perform(
+        req: tonic::Request<Self>,
+        inner: &mut Node,
+    ) -> Result<tonic::Response<Self::Response>, tonic::Status> {
+        inner.staking_query_client().pool(req).await
+    }
+}
+
+#[async_trait]
+impl GrpcRequest for crate::sge::mint::QueryInflationRequest {
+    type Response = crate::sge::mint::QueryInflationResponse;
+    async fn perform(
+        req: tonic::Request<Self>,
+        inner: &mut Node,
+    ) -> Result<tonic::Response<Self::Response>, tonic::Status> {
+        inner.sge_query_client().inflation(req).await
     }
 }

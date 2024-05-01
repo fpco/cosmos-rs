@@ -79,6 +79,7 @@ const OSMOSIS_VERSION_EPOCHS: &str = "5494ad8992810c7385ec8a63e5e9476adf332d4c";
 const OSMOSIS_VERSION_TXFEES: &str = "v22.0.0";
 const REGEN_VERSION: &str = "v1.3.3-alpha.regen.1";
 const GOOGLE_VERSION: &str = "master";
+const SGE_TAG_URL: &str = "https://raw.githubusercontent.com/sge-network/sge/v1.6.1/proto";
 
 const COSMOS_SDK_BASE: &str = "cosmos/base/v1beta1";
 const COSMOS_SDK_QUERY: &str = "cosmos/base/query/v1beta1";
@@ -121,6 +122,11 @@ impl Proto {
                     ProtoTxFees::Gov => format!("https://raw.githubusercontent.com/osmosis-labs/osmosis/{OSMOSIS_VERSION_TXFEES}/proto/osmosis/txfees/v1beta1/gov.proto"),
                     ProtoTxFees::Query => format!("https://raw.githubusercontent.com/osmosis-labs/osmosis/{OSMOSIS_VERSION_TXFEES}/proto/osmosis/txfees/v1beta1/query.proto"),
                 }
+            },
+            Proto::Sge(ProtoSge::Mint(p)) => match p {
+                ProtoSgeMint::Phase => format!("{SGE_TAG_URL}/sge/mint/phase.proto"),
+                ProtoSgeMint::Params => format!("{SGE_TAG_URL}/sge/mint/params.proto"),
+                ProtoSgeMint::Query => format!("{SGE_TAG_URL}/sge/mint/query.proto"),
             }
         }
     }
@@ -166,6 +172,11 @@ impl Proto {
                     ProtoTxFees::Query => format!("osmosis/txfees/v1beta1/query.proto"),
                 },
             },
+            Proto::Sge(ProtoSge::Mint(p)) => match p {
+                ProtoSgeMint::Phase => format!("sge/mint/phase.proto"),
+                ProtoSgeMint::Params => format!("sge/mint/params.proto"),
+                ProtoSgeMint::Query => format!("sge/mint/query.proto"),
+            }
         }
     }
 
@@ -193,6 +204,9 @@ impl Proto {
             Proto::Osmosis(ProtoOsmosis::TxFees(ProtoTxFees::Genesis)),
             Proto::Osmosis(ProtoOsmosis::TxFees(ProtoTxFees::Gov)),
             Proto::Osmosis(ProtoOsmosis::TxFees(ProtoTxFees::Query)),
+            Proto::Sge(ProtoSge::Mint(ProtoSgeMint::Phase)),
+            Proto::Sge(ProtoSge::Mint(ProtoSgeMint::Params)),
+            Proto::Sge(ProtoSge::Mint(ProtoSgeMint::Query)),
         ]
     }
 }
@@ -203,6 +217,7 @@ enum Proto {
     Gogo,
     Google(ProtoGoogle),
     Osmosis(ProtoOsmosis),
+    Sge(ProtoSge),
 }
 
 enum ProtoCosmosSdk {
@@ -241,5 +256,15 @@ enum ProtoTxFees {
     FeeToken,
     Genesis,
     Gov,
+    Query,
+}
+
+enum ProtoSge {
+    Mint(ProtoSgeMint),
+}
+
+enum ProtoSgeMint {
+    Phase,
+    Params,
     Query,
 }

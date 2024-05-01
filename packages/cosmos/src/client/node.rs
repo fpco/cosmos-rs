@@ -309,6 +309,20 @@ impl Node {
     ) -> crate::osmosis::txfees::query_client::QueryClient<CosmosChannel> {
         crate::osmosis::txfees::query_client::QueryClient::new(self.node_inner.channel.clone())
     }
+
+    pub(crate) fn staking_query_client(
+        &self,
+    ) -> cosmos_sdk_proto::cosmos::staking::v1beta1::query_client::QueryClient<CosmosChannel> {
+        cosmos_sdk_proto::cosmos::staking::v1beta1::query_client::QueryClient::new(
+            self.node_inner.channel.clone(),
+        )
+    }
+
+    pub(crate) fn sge_query_client(
+        &self,
+    ) -> crate::sge::mint::query_client::QueryClient<CosmosChannel> {
+        crate::sge::mint::query_client::QueryClient::new(self.node_inner.channel.clone())
+    }
 }
 
 #[derive(Debug)]
