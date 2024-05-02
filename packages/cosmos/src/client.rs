@@ -934,7 +934,7 @@ impl Cosmos {
             .perform_query(GetBlockByHeightRequest { height }, action.clone(), true)
             .await?
             .into_inner();
-        BlockInfo::new(action, res.block_id, res.sdk_block, Some(height))
+        BlockInfo::new(action, res.block_id, res.sdk_block, res.block, Some(height))
     }
 
     /// Same as [Self::get_transaction_with_fallbacks] but for [Self::get_block_info]
@@ -948,7 +948,7 @@ impl Cosmos {
             .await
             .map(|x| x.into_inner());
         match res {
-            Ok(res) => BlockInfo::new(action, res.block_id, res.sdk_block, Some(height)),
+            Ok(res) => BlockInfo::new(action, res.block_id, res.sdk_block, res.block, Some(height)),
             Err(e) => {
                 for node in self.pool.node_chooser.all_nodes() {
                     if let Ok(mut node_guard) = self.pool.get_with_node(node).await {
@@ -964,6 +964,7 @@ impl Cosmos {
                                 action,
                                 res.block_id,
                                 res.sdk_block,
+                                res.block,
                                 Some(height),
                             );
                         }
@@ -996,7 +997,7 @@ impl Cosmos {
             .perform_query(GetLatestBlockRequest {}, action.clone(), true)
             .await?
             .into_inner();
-        BlockInfo::new(action, res.block_id, res.sdk_block, None)
+        BlockInfo::new(action, res.block_id, res.sdk_block, res.block, None)
     }
 
     /// Get the most recently seen block height.
@@ -1104,26 +1105,42 @@ impl BlockInfo {
     fn new(
         action: Action,
         block_id: Option<tendermint_proto::v0_34::types::BlockId>,
-        block: Option<cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::Block>,
+        sdk_block: Option<cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::Block>,
+        block: Option<tendermint_proto::v0_34::types::Block>,
         height: Option<i64>,
     ) -> Result<BlockInfo, crate::Error> {
         (|| {
             let block_id = block_id.ok_or("get_block_info: block_id is None".to_owned())?;
-            let block = block.ok_or("get_block_info: block is None".to_owned())?;
-            let header = block
-                .header
-                .ok_or("get_block_info: header is None".to_owned())?;
-            let time = header
-                .time
-                .ok_or("get_block_info: time is None".to_owned())?;
-            let data = block
-                .data
-                .ok_or("get_block_info: data is None".to_owned())?;
+            let (timestamp, header_height, chain_id, data) = match (sdk_block, block) {
+                (Some(sdk_block), _) => {
+                    let header = sdk_block
+                        .header
+                        .ok_or("get_block_info: header is None".to_owned())?;
+                    let time = header
+                        .time
+                        .ok_or("get_block_info: time is None".to_owned())?;
+                    let timestamp =
+                        Utc.timestamp_nanos(time.seconds * 1_000_000_000 + i64::from(time.nanos));
+                    (timestamp, header.height, header.chain_id, sdk_block.data)
+                }
+                (None, Some(block)) => {
+                    let header = block
+                        .header
+                        .ok_or("get_block_info: header is None".to_owned())?;
+                    let time = header
+                        .time
+                        .ok_or("get_block_info: time is None".to_owned())?;
+                    let timestamp =
+                        Utc.timestamp_nanos(time.seconds * 1_000_000_000 + i64::from(time.nanos));
+                    (timestamp, header.height, header.chain_id, block.data)
+                }
+                (None, None) => return Err("get_block_info: block is None".to_owned()),
+            };
+            let data = data.ok_or("get_block_info: data is None".to_owned())?;
             if let Some(height) = height {
-                if height != header.height {
+                if height != header_height {
                     return Err(format!(
-                        "Mismatched height from blockchain. Got {}, expected {height}",
-                        header.height
+                        "Mismatched height from blockchain. Got {header_height}, expected {height}"
                     ));
                 }
             }
@@ -1136,12 +1153,11 @@ impl BlockInfo {
                 txhashes.push(hex::encode_upper(digest));
             }
             Ok(BlockInfo {
-                height: header.height,
+                height: header_height,
                 block_hash: hex::encode_upper(block_id.hash),
-                timestamp: Utc
-                    .timestamp_nanos(time.seconds * 1_000_000_000 + i64::from(time.nanos)),
+                timestamp,
                 txhashes,
-                chain_id: header.chain_id,
+                chain_id,
             })
         })()
         .map_err(|message| crate::Error::InvalidChainResponse { message, action })
