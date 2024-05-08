@@ -26,6 +26,8 @@ fn get_code_id(chain_id: &str, contract_type: ContractType) -> Result<u64> {
         ("pacific-1", ContractType::Cw4Group) => Ok(47),
         ("injective-1", ContractType::Cw3Flex) => Ok(124),
         ("injective-1", ContractType::Cw4Group) => Ok(125),
+        ("neutron-1", ContractType::Cw3Flex) => Ok(1189),
+        ("neutron-1", ContractType::Cw4Group) => Ok(1190),
         _ => Err(anyhow::anyhow!(
             "No code ID found for combo {chain_id}/{contract_type:?}"
         )),
