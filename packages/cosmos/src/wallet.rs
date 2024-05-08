@@ -3,10 +3,10 @@ use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{ripemd160, sha256, Hash};
 use bitcoin::secp256k1::ecdsa::Signature;
 use bitcoin::secp256k1::{All, Message, Secp256k1};
-use bitcoin::util::bip32::{DerivationPath, ExtendedPrivKey, ExtendedPubKey};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
@@ -87,7 +87,7 @@ impl SeedPhrase {
     /// used. Similarly, if `self` does not include a derivation path, the
     /// default for the HRP is used.
     pub fn with_hrp(&self, hrp: AddressHrp) -> Result<Wallet, WalletError> {
-        let root_private_key = bitcoin::util::bip32::ExtendedPrivKey::new_master(
+        let root_private_key = bitcoin::bip32::Xpriv::new_master(
             bitcoin::Network::Bitcoin,
             &self.mnemonic.to_seed(""),
         )
@@ -104,7 +104,7 @@ impl SeedPhrase {
                 derivation_path,
                 source,
             })?;
-        let public_key = ExtendedPubKey::from_priv(secp, &privkey);
+        let public_key = Xpub::from_priv(secp, &privkey);
         let public_key_bytes = public_key.public_key.serialize();
         let public_key_bytes_uncompressed = public_key.public_key.serialize_uncompressed();
 
@@ -291,7 +291,7 @@ const OSMO_LOCAL_PHRASE: &str = "notice oak worry limit wrap speak medal online 
 // Not deriving Copy since this is a pretty large data structure.
 pub struct Wallet {
     address: Address,
-    privkey: ExtendedPrivKey,
+    privkey: Xpriv,
     pub(crate) public_key: WalletPublicKey,
 }
 
@@ -328,10 +328,10 @@ impl Wallet {
     /// deriving this wallet.
     pub fn sign_bytes(&self, msg: &[u8]) -> Signature {
         let msg = match self.public_key {
-            WalletPublicKey::Cosmos(_) => sha256::Hash::hash(msg).into_inner(),
+            WalletPublicKey::Cosmos(_) => *sha256::Hash::hash(msg).as_ref(),
             WalletPublicKey::Ethereum(_) => keccak(msg),
         };
-        let msg = Message::from_slice(msg.as_ref()).unwrap();
+        let msg = Message::from_digest_slice(msg.as_ref()).unwrap();
         global_secp().sign_ecdsa(&msg, &self.privkey.private_key)
     }
 
@@ -400,7 +400,7 @@ impl Wallet {
 
 fn cosmos_address_from_public_key(public_key: &[u8]) -> [u8; 20] {
     let sha = sha256::Hash::hash(public_key);
-    ripemd160::Hash::hash(sha.as_ref()).into_inner()
+    *ripemd160::Hash::hash(sha.as_ref()).as_ref()
 }
 
 fn eth_address_from_public_key(public_key: &[u8; 65]) -> [u8; 20] {

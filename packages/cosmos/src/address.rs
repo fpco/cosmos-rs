@@ -5,8 +5,8 @@ use std::{
     sync::Arc,
 };
 
-use bech32::{FromBase32, ToBase32};
-use bitcoin::util::bip32::DerivationPath;
+use bech32::{Bech32, Hrp};
+use bitcoin::bip32::DerivationPath;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use serde::de::Visitor;
@@ -31,27 +31,13 @@ enum RawAddressInner {
 
 impl RawAddress {
     /// Parse a Cosmos-compatible address into an HRP and [RawAddress].
-    pub fn parse_with_hrp(s: &str) -> Result<(String, RawAddress), AddressError> {
-        let (hrp, data, variant) =
-            bech32::decode(s).map_err(|source| AddressError::InvalidBech32 {
-                address: s.to_owned(),
-                source,
-            })?;
-        match variant {
-            bech32::Variant::Bech32 => (),
-            bech32::Variant::Bech32m => {
-                return Err(AddressError::InvalidVariant {
-                    address: s.to_owned(),
-                    variant,
-                });
-            }
-        }
-        let data = Vec::<u8>::from_base32(&data).map_err(|source| AddressError::InvalidBase32 {
+    pub fn parse_with_hrp(s: &str) -> Result<(Hrp, RawAddress), AddressError> {
+        let (hrp, data) = bech32::decode(s).map_err(|source| AddressError::InvalidBech32 {
             address: s.to_owned(),
             source,
         })?;
-        let data = data.as_slice();
 
+        let data = data.as_slice();
         let raw_address_inner = match data.try_into() {
             Ok(raw_address) => RawAddressInner::Twenty { raw_address },
             Err(_) => data
@@ -171,13 +157,13 @@ pub enum PublicKeyMethod {
 
 impl Display for Address {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        bech32::encode_to_fmt(
-            fmt,
-            self.hrp.0,
-            self.raw_address.to_base32(),
-            bech32::Variant::Bech32,
-        )
-        .expect("Invalid HRP")
+        let raw_address = match self.raw_address.0 {
+            RawAddressInner::Twenty { raw_address } => raw_address.to_vec(),
+            RawAddressInner::ThirtyTwo { raw_address } => raw_address.to_vec(),
+        };
+        let hrp = Hrp::parse(self.hrp.0).expect("Invalid HRP");
+        bech32::encode_to_fmt::<Bech32, _>(fmt, hrp, &raw_address[..]).expect("Encode issue");
+        Ok(())
     }
 }
 
@@ -199,7 +185,7 @@ impl FromStr for Address {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         RawAddress::parse_with_hrp(s).map(|(hrp, raw_address)| {
             raw_address.with_hrp(
-                AddressHrp::from_string(hrp).expect("parse_with_hrp gave back in invalid HRP"),
+                AddressHrp::from_hrp(hrp).expect("parse_with_hrp gave back in invalid HRP"),
             )
         })
     }
@@ -356,6 +342,25 @@ impl AddressHrp {
         Ok(AddressHrp(s))
     }
 
+    /// Minor optimization over [AddressHrp::from_string]: use an owned [Hrp] for initializing.
+    pub fn from_hrp(s: Hrp) -> Result<Self, AddressError> {
+        let s = s.to_lowercase();
+        let set = Self::get_set();
+        {
+            if let Some(s) = set.read().get(&*s) {
+                return Ok(AddressHrp(s));
+            }
+        }
+        let mut guard = set.write();
+        // Deal with race condition: was this added between our read and now?
+        if let Some(s) = guard.get(&*s) {
+            return Ok(AddressHrp(s));
+        }
+        let s = Box::leak(s.into_boxed_str());
+        guard.insert(s);
+        Ok(AddressHrp(s))
+    }
+
     /// Get the raw string HRP
     pub fn as_str(self) -> &'static str {
         self.0
@@ -364,7 +369,7 @@ impl AddressHrp {
 
 fn is_valid_hrp(hrp: &str) -> bool {
     // Unfortunately `check_hrp` isn't exposed from bech32, so doing something silly...
-    bech32::encode(hrp, [], bech32::Variant::Bech32).is_ok()
+    Hrp::parse(hrp).is_ok()
 }
 
 /// Trait for any values that can report their bech32 HRP (human-readable part).

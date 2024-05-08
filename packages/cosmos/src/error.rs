@@ -4,7 +4,7 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use bip39::Mnemonic;
-use bitcoin::util::bip32::DerivationPath;
+use bitcoin::bip32::DerivationPath;
 use chrono::{DateTime, Utc};
 use http::uri::InvalidUri;
 
@@ -23,17 +23,7 @@ pub enum AddressError {
     #[error("Invalid bech32 encoding in {address:?}: {source:?}")]
     InvalidBech32 {
         address: String,
-        source: bech32::Error,
-    },
-    #[error("Invalid bech32 variant {variant:?} used in {address:?}, must use regular Bech32")]
-    InvalidVariant {
-        address: String,
-        variant: bech32::Variant,
-    },
-    #[error("Invalid base32 encoded data in {address:?}: {source:?}")]
-    InvalidBase32 {
-        address: String,
-        source: bech32::Error,
+        source: bech32::DecodeError,
     },
     #[error("Invalid byte count within {address:?}, expected 20 or 32 bytes, received {actual}")]
     InvalidByteCount { address: String, actual: usize },
@@ -46,11 +36,11 @@ pub enum AddressError {
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum WalletError {
     #[error("Could not get root private key from mnemonic: {source:?}")]
-    CouldNotGetRootPrivateKey { source: bitcoin::util::bip32::Error },
+    CouldNotGetRootPrivateKey { source: bitcoin::bip32::Error },
     #[error("Could not derive private key using derivation path {derivation_path}: {source:?}")]
     CouldNotDerivePrivateKey {
         derivation_path: Arc<DerivationPath>,
-        source: bitcoin::util::bip32::Error,
+        source: bitcoin::bip32::Error,
     },
     #[error("Invalid derivation path {path:?}: {source:?}")]
     InvalidDerivationPath {
@@ -358,7 +348,7 @@ pub enum QueryErrorDetails {
     #[error("Error querying server, received HTTP status code {status}. {source:?}")]
     Unavailable {
         source: tonic::Status,
-        status: reqwest::StatusCode,
+        status: http::status::StatusCode,
     },
     #[error("Server does not implement expected services, it may not be a Cosmos gRPC endpoint. {source}")]
     Unimplemented { source: tonic::Status },
