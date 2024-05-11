@@ -36,7 +36,7 @@ struct NodeInner {
     simulate_sequences: RwLock<HashMap<Address, SequenceInformation>>,
     broadcast_sequences: RwLock<HashMap<Address, SequenceInformation>>,
     query_count: RwLock<QueryCount>,
-    max_decoding_message_size: Option<usize>
+    max_decoding_message_size: Option<usize>,
 }
 
 #[derive(Default)]
@@ -254,12 +254,11 @@ impl Node {
     pub(crate) fn auth_query_client(
         &self,
     ) -> cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient<CosmosChannel> {
-        let client =
-            cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient::new(
+        let client = cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient::new(
             self.node_inner.channel.clone(),
         );
         if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size)
+            return client.max_decoding_message_size(max_decoding_message_size);
         }
         client
     }
@@ -271,7 +270,7 @@ impl Node {
             self.node_inner.channel.clone(),
         );
         if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size)
+            return client.max_decoding_message_size(max_decoding_message_size);
         }
         client
     }
@@ -283,7 +282,7 @@ impl Node {
             self.node_inner.channel.clone(),
         );
         if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size)
+            return client.max_decoding_message_size(max_decoding_message_size);
         }
         client
     }
@@ -295,7 +294,7 @@ impl Node {
             self.node_inner.channel.clone(),
         );
         if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size)
+            return client.max_decoding_message_size(max_decoding_message_size);
         }
         client
     }
@@ -305,11 +304,12 @@ impl Node {
     ) -> cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::service_client::ServiceClient<
         CosmosChannel,
     > {
-        let client = cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::service_client::ServiceClient::new(
-            self.node_inner.channel.clone(),
-        );
+        let client =
+            cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::service_client::ServiceClient::new(
+                self.node_inner.channel.clone(),
+            );
         if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size)
+            return client.max_decoding_message_size(max_decoding_message_size);
         }
         client
     }
@@ -321,7 +321,7 @@ impl Node {
             self.node_inner.channel.clone(),
         );
         if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size)
+            return client.max_decoding_message_size(max_decoding_message_size);
         }
         client
     }
