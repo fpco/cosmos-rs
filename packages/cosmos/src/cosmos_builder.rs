@@ -45,6 +45,7 @@ pub struct CosmosBuilder {
     max_price: Option<f64>,
     rate_limit_per_second: Option<u64>,
     log_requests: Option<bool>,
+    max_decoding_message_size: Option<usize>,
 }
 
 impl CosmosBuilder {
@@ -84,6 +85,7 @@ impl CosmosBuilder {
             rate_limit_per_second: None,
             is_fast_chain: matches!(hrp.as_str(), "sei" | "inj"),
             log_requests: None,
+            max_decoding_message_size: None,
         }
     }
 
@@ -438,6 +440,18 @@ impl CosmosBuilder {
     /// See [Self::get_log_requests]
     pub fn set_log_requests(&mut self, log_requests: bool) {
         self.log_requests = Some(log_requests);
+    }
+
+    /// Limits the maximum size of a decoded message.
+    ///
+    /// Default: 4 MB
+    pub fn get_max_decoding_message_size(&self) -> Option<usize> {
+        self.max_decoding_message_size
+    }
+
+    /// See [Self::get_max_decoding_message_size]
+    pub fn set_max_decoding_message_size(&mut self, max_decoding_message_size: usize) {
+        self.max_decoding_message_size = Some(max_decoding_message_size);
     }
 }
 
