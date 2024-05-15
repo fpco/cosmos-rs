@@ -80,7 +80,8 @@ impl TokenFactory {
                 action: Action::TokenFactory {
                     txbuilder,
                     txhash: res.txhash.clone(),
-                },
+                }
+                .into(),
             })?;
 
         Ok((res, denom))

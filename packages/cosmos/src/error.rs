@@ -174,21 +174,24 @@ pub enum Error {
     )]
     JsonDeserialize {
         source: serde_json::Error,
-        action: Action,
+        action: Box<Action>,
     },
     #[error(transparent)]
     Query(#[from] QueryError),
     #[error("Error parsing data returned from chain: {source}. While performing: {action}")]
     ChainParse {
         source: Box<crate::error::ChainParseError>,
-        action: Action,
+        action: Box<Action>,
     },
     #[error("Invalid response from chain: {message}. While performing: {action}")]
-    InvalidChainResponse { message: String, action: Action },
+    InvalidChainResponse {
+        message: String,
+        action: Box<Action>,
+    },
     #[error("Timed out waiting for transaction {txhash}")]
     WaitForTransactionTimedOut { txhash: String },
     #[error("Timed out waiting for transaction {txhash} during {action}")]
-    WaitForTransactionTimedOutWhile { txhash: String, action: Action },
+    WaitForTransactionTimedOutWhile { txhash: String, action: Box<Action> },
     #[error("Unable to load WASM code from {}: {source}", path.display())]
     LoadingWasmFromFile {
         path: PathBuf,

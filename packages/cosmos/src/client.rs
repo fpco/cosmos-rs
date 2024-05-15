@@ -656,34 +656,34 @@ impl Cosmos {
                 res.account
                     .ok_or_else(|| crate::Error::InvalidChainResponse {
                         message: "no eth account found".to_owned(),
-                        action: action.clone(),
+                        action: action.clone().into(),
                     })?
                     .value
                     .as_ref(),
             )
             .map_err(|source| crate::Error::InvalidChainResponse {
                 message: format!("Unable to parse eth_account: {source}"),
-                action: action.clone(),
+                action: action.clone().into(),
             })?;
             eth_account
                 .base_account
                 .ok_or_else(|| crate::Error::InvalidChainResponse {
                     message: "no base account found".to_owned(),
-                    action: action.clone(),
+                    action: action.clone().into(),
                 })?
         } else {
             prost::Message::decode(
                 res.account
                     .ok_or_else(|| crate::Error::InvalidChainResponse {
                         message: "no account found".to_owned(),
-                        action: action.clone(),
+                        action: action.clone().into(),
                     })?
                     .value
                     .as_ref(),
             )
             .map_err(|source| crate::Error::InvalidChainResponse {
                 message: format!("Unable to parse account: {source}"),
-                action,
+                action: action.into(),
             })?
         };
         Ok(base_account)
@@ -740,18 +740,18 @@ impl Cosmos {
             .tx
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing tx field".to_owned(),
-                action: action.clone(),
+                action: action.clone().into(),
             })?
             .body
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing tx.body field".to_owned(),
-                action: action.clone(),
+                action: action.clone().into(),
             })?;
         let txres = txres
             .tx_response
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing tx_response field".to_owned(),
-                action: action.clone(),
+                action: action.clone().into(),
             })?;
         Ok((txbody, txres))
     }
@@ -879,7 +879,10 @@ impl Cosmos {
         }
         Err(match action {
             None => crate::Error::WaitForTransactionTimedOut { txhash },
-            Some(action) => crate::Error::WaitForTransactionTimedOutWhile { txhash, action },
+            Some(action) => crate::Error::WaitForTransactionTimedOutWhile {
+                txhash,
+                action: action.into(),
+            },
         })
     }
 
@@ -1160,7 +1163,10 @@ impl BlockInfo {
                 chain_id,
             })
         })()
-        .map_err(|message| crate::Error::InvalidChainResponse { message, action })
+        .map_err(|message| crate::Error::InvalidChainResponse {
+            message,
+            action: action.into(),
+        })
     }
 }
 
@@ -1438,7 +1444,7 @@ impl TxBuilder {
             .as_ref()
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing gas_info in SimulateResponse".to_owned(),
-                action,
+                action: action.into(),
             })?
             .gas_used;
 
@@ -1538,7 +1544,7 @@ impl TxBuilder {
             let res = tonic.into_inner().tx_response.ok_or_else(|| {
                 crate::Error::InvalidChainResponse {
                     message: "Missing inner tx_response".to_owned(),
-                    action: mk_action(),
+                    action: mk_action().into(),
                 }
             })?;
 

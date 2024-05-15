@@ -72,7 +72,8 @@ impl Cosmos {
                     action: Action::StoreCode {
                         txbuilder,
                         txhash: res.txhash,
-                    },
+                    }
+                    .into(),
                 }
             })?),
         )
@@ -126,7 +127,8 @@ impl Cosmos {
                 action: Action::StoreCode {
                     txbuilder,
                     txhash: res.txhash.clone(),
-                },
+                }
+                .into(),
             }
         })?);
         Ok((res, code_id))

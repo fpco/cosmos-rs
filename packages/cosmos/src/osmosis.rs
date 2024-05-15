@@ -58,7 +58,7 @@ impl Cosmos {
                     source: Box::new(ChainParseError::TxFees {
                         err: err.to_string(),
                     }),
-                    action: Action::OsmosisTxFeesInfo,
+                    action: Action::OsmosisTxFeesInfo.into(),
                 })?,
             false => {
                 let eip_base_fee =
@@ -69,14 +69,14 @@ impl Cosmos {
                             source: Box::new(ChainParseError::TxFees {
                                 err: err.to_string(),
                             }),
-                            action: Action::OsmosisTxFeesInfo,
+                            action: Action::OsmosisTxFeesInfo.into(),
                         })?;
 
                 Decimal::from_atomics(eip_base_fee, 18).map_err(|err| Error::ChainParse {
                     source: Box::new(ChainParseError::TxFees {
                         err: err.to_string(),
                     }),
-                    action: Action::OsmosisTxFeesInfo,
+                    action: Action::OsmosisTxFeesInfo.into(),
                 })?
             }
         };
