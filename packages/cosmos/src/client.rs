@@ -656,34 +656,34 @@ impl Cosmos {
                 res.account
                     .ok_or_else(|| crate::Error::InvalidChainResponse {
                         message: "no eth account found".to_owned(),
-                        action: action.clone(),
+                        action: action.clone().into(),
                     })?
                     .value
                     .as_ref(),
             )
             .map_err(|source| crate::Error::InvalidChainResponse {
                 message: format!("Unable to parse eth_account: {source}"),
-                action: action.clone(),
+                action: action.clone().into(),
             })?;
             eth_account
                 .base_account
                 .ok_or_else(|| crate::Error::InvalidChainResponse {
                     message: "no base account found".to_owned(),
-                    action: action.clone(),
+                    action: action.clone().into(),
                 })?
         } else {
             prost::Message::decode(
                 res.account
                     .ok_or_else(|| crate::Error::InvalidChainResponse {
                         message: "no account found".to_owned(),
-                        action: action.clone(),
+                        action: action.clone().into(),
                     })?
                     .value
                     .as_ref(),
             )
             .map_err(|source| crate::Error::InvalidChainResponse {
                 message: format!("Unable to parse account: {source}"),
-                action,
+                action: action.into(),
             })?
         };
         Ok(base_account)
@@ -740,18 +740,18 @@ impl Cosmos {
             .tx
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing tx field".to_owned(),
-                action: action.clone(),
+                action: action.clone().into(),
             })?
             .body
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing tx.body field".to_owned(),
-                action: action.clone(),
+                action: action.clone().into(),
             })?;
         let txres = txres
             .tx_response
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing tx_response field".to_owned(),
-                action: action.clone(),
+                action: action.clone().into(),
             })?;
         Ok((txbody, txres))
     }
@@ -879,7 +879,10 @@ impl Cosmos {
         }
         Err(match action {
             None => crate::Error::WaitForTransactionTimedOut { txhash },
-            Some(action) => crate::Error::WaitForTransactionTimedOutWhile { txhash, action },
+            Some(action) => crate::Error::WaitForTransactionTimedOutWhile {
+                txhash,
+                action: action.into(),
+            },
         })
     }
 
@@ -1160,7 +1163,10 @@ impl BlockInfo {
                 chain_id,
             })
         })()
-        .map_err(|message| crate::Error::InvalidChainResponse { message, action })
+        .map_err(|message| crate::Error::InvalidChainResponse {
+            message,
+            action: action.into(),
+        })
     }
 }
 
@@ -1438,7 +1444,7 @@ impl TxBuilder {
             .as_ref()
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing gas_info in SimulateResponse".to_owned(),
-                action,
+                action: action.into(),
             })?
             .gas_used;
 
@@ -1489,13 +1495,14 @@ impl TxBuilder {
         // }
         let body_ref = &body;
         let retry_with_price = |amount| async move {
+            let amount = Coin {
+                denom: cosmos.pool.builder.gas_coin().to_owned(),
+                amount,
+            };
             let auth_info = AuthInfo {
                 signer_infos: vec![self.make_signer_info(sequence, Some(wallet))],
                 fee: Some(Fee {
-                    amount: vec![Coin {
-                        denom: cosmos.pool.builder.gas_coin().to_owned(),
-                        amount,
-                    }],
+                    amount: vec![amount.clone()],
                     gas_limit: gas_to_request,
                     payer: "".to_owned(),
                     granter: "".to_owned(),
@@ -1518,20 +1525,26 @@ impl TxBuilder {
                 signatures: vec![signature.serialize_compact().to_vec()],
             };
 
+            let mk_action = move || Action::Broadcast {
+                txbuilder: self.clone(),
+                gas_wanted: gas_to_request,
+                fee: amount.clone(),
+            };
+
             let PerformQueryWrapper { grpc_url, tonic } = cosmos
                 .perform_query(
                     BroadcastTxRequest {
                         tx_bytes: tx.encode_to_vec(),
                         mode: BroadcastMode::Sync as i32,
                     },
-                    Action::Broadcast(self.clone()),
+                    mk_action(),
                     true,
                 )
                 .await?;
             let res = tonic.into_inner().tx_response.ok_or_else(|| {
                 crate::Error::InvalidChainResponse {
                     message: "Missing inner tx_response".to_owned(),
-                    action: Action::Broadcast(self.clone()),
+                    action: mk_action().into(),
                 }
             })?;
 
@@ -1540,7 +1553,7 @@ impl TxBuilder {
                     code: res.code.into(),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
-                    action: Action::Broadcast(self.clone()).into(),
+                    action: mk_action().into(),
                     grpc_url,
                     stage: crate::error::TransactionStage::Broadcast,
                 });
@@ -1549,14 +1562,14 @@ impl TxBuilder {
             tracing::debug!("Initial BroadcastTxResponse: {res:?}");
 
             let (_, res) = cosmos
-                .wait_for_transaction_with_action(res.txhash, Some(Action::Broadcast(self.clone())))
+                .wait_for_transaction_with_action(res.txhash, Some(mk_action()))
                 .await?;
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
                     code: res.code.into(),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
-                    action: Action::Broadcast(self.clone()).into(),
+                    action: mk_action().into(),
                     grpc_url,
                     stage: crate::error::TransactionStage::Wait,
                 });

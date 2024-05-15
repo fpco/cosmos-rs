@@ -109,7 +109,11 @@ impl CodeId {
             res.parse_first_instantiated_contract()
                 .map_err(|source| crate::Error::ChainParse {
                     source: source.into(),
-                    action: Action::Broadcast(txbuilder.clone()),
+                    action: Action::InstantiateContract {
+                        txbuilder: txbuilder.clone(),
+                        txhash: res.txhash.clone(),
+                    }
+                    .into(),
                 })?;
 
         if addr.get_address_hrp() == self.get_address_hrp() {
@@ -122,7 +126,11 @@ impl CodeId {
                     addr,
                     addr.get_address_hrp()
                 ),
-                action: Action::Broadcast(txbuilder),
+                action: Action::InstantiateContract {
+                    txbuilder,
+                    txhash: res.txhash,
+                }
+                .into(),
             })
         }
     }
@@ -290,8 +298,10 @@ impl Contract {
             )
             .await?
             .into_inner();
-        serde_json::from_slice(&res.data)
-            .map_err(|source| crate::Error::JsonDeserialize { source, action })
+        serde_json::from_slice(&res.data).map_err(|source| crate::Error::JsonDeserialize {
+            source,
+            action: action.into(),
+        })
     }
 
     /// Perform a contract migration with the given message
@@ -338,7 +348,7 @@ impl Contract {
             .contract_info
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Missing contract_info field".to_string(),
-                action,
+                action: action.into(),
             })
     }
 

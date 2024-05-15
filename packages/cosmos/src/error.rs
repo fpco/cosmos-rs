@@ -174,21 +174,24 @@ pub enum Error {
     )]
     JsonDeserialize {
         source: serde_json::Error,
-        action: Action,
+        action: Box<Action>,
     },
     #[error(transparent)]
     Query(#[from] QueryError),
     #[error("Error parsing data returned from chain: {source}. While performing: {action}")]
     ChainParse {
         source: Box<crate::error::ChainParseError>,
-        action: Action,
+        action: Box<Action>,
     },
     #[error("Invalid response from chain: {message}. While performing: {action}")]
-    InvalidChainResponse { message: String, action: Action },
+    InvalidChainResponse {
+        message: String,
+        action: Box<Action>,
+    },
     #[error("Timed out waiting for transaction {txhash}")]
     WaitForTransactionTimedOut { txhash: String },
     #[error("Timed out waiting for transaction {txhash} during {action}")]
-    WaitForTransactionTimedOutWhile { txhash: String, action: Action },
+    WaitForTransactionTimedOutWhile { txhash: String, action: Box<Action> },
     #[error("Unable to load WASM code from {}: {source}", path.display())]
     LoadingWasmFromFile {
         path: PathBuf,
@@ -248,7 +251,11 @@ pub enum Action {
     GetBlock(i64),
     GetLatestBlock,
     Simulate(TxBuilder),
-    Broadcast(TxBuilder),
+    Broadcast {
+        txbuilder: TxBuilder,
+        gas_wanted: u64,
+        fee: cosmos_sdk_proto::cosmos::base::v1beta1::Coin,
+    },
     RawQuery {
         contract: Address,
         key: StringOrBytes,
@@ -264,6 +271,18 @@ pub enum Action {
     SanityCheck,
     OsmosisEpochsInfo,
     OsmosisTxFeesInfo,
+    StoreCode {
+        txbuilder: TxBuilder,
+        txhash: String,
+    },
+    InstantiateContract {
+        txbuilder: TxBuilder,
+        txhash: String,
+    },
+    TokenFactory {
+        txbuilder: TxBuilder,
+        txhash: String,
+    },
 }
 
 impl Display for Action {
@@ -278,7 +297,15 @@ impl Display for Action {
             Action::GetBlock(height) => write!(f, "get block {height}"),
             Action::GetLatestBlock => f.write_str("get latest block"),
             Action::Simulate(txbuilder) => write!(f, "simulating transaction: {txbuilder}"),
-            Action::Broadcast(txbuilder) => write!(f, "broadcasting transaction: {txbuilder}"),
+            Action::Broadcast {
+                txbuilder,
+                gas_wanted,
+                fee,
+            } => write!(
+                f,
+                "broadcasting transaction with {gas_wanted} gas and {}{} fee: {txbuilder}",
+                fee.amount, fee.denom
+            ),
             Action::RawQuery { contract, key } => {
                 write!(f, "raw query contract {contract} with key: {key}")
             }
@@ -292,6 +319,16 @@ impl Display for Action {
             Action::SanityCheck => f.write_str("sanity check"),
             Action::OsmosisEpochsInfo => f.write_str("get Osmosis epochs info"),
             Action::OsmosisTxFeesInfo => f.write_str("get Osmosis txfees info"),
+            Action::StoreCode { txbuilder, txhash } => {
+                write!(f, "store code in {txhash}: {txbuilder}")
+            }
+            Action::InstantiateContract { txbuilder, txhash } => {
+                write!(f, "instantiate contract in {txhash}: {txbuilder}")
+            }
+            Action::TokenFactory { txbuilder, txhash } => write!(
+                f,
+                "perform token factory operation in {txhash}: {txbuilder}"
+            ),
         }
     }
 }

@@ -69,7 +69,11 @@ impl Cosmos {
             self.make_code_id(res.parse_first_stored_code_id().map_err(|source| {
                 crate::Error::ChainParse {
                     source: source.into(),
-                    action: Action::Broadcast(txbuilder),
+                    action: Action::StoreCode {
+                        txbuilder,
+                        txhash: res.txhash,
+                    }
+                    .into(),
                 }
             })?),
         )
@@ -120,7 +124,11 @@ impl Cosmos {
         let code_id = self.make_code_id(res.parse_first_stored_code_id().map_err(|source| {
             crate::Error::ChainParse {
                 source: source.into(),
-                action: Action::Broadcast(txbuilder),
+                action: Action::StoreCode {
+                    txbuilder,
+                    txhash: res.txhash.clone(),
+                }
+                .into(),
             }
         })?);
         Ok((res, code_id))
