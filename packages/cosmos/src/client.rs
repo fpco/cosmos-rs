@@ -1489,13 +1489,14 @@ impl TxBuilder {
         // }
         let body_ref = &body;
         let retry_with_price = |amount| async move {
+            let amount = Coin {
+                denom: cosmos.pool.builder.gas_coin().to_owned(),
+                amount,
+            };
             let auth_info = AuthInfo {
                 signer_infos: vec![self.make_signer_info(sequence, Some(wallet))],
                 fee: Some(Fee {
-                    amount: vec![Coin {
-                        denom: cosmos.pool.builder.gas_coin().to_owned(),
-                        amount,
-                    }],
+                    amount: vec![amount.clone()],
                     gas_limit: gas_to_request,
                     payer: "".to_owned(),
                     granter: "".to_owned(),
@@ -1518,20 +1519,26 @@ impl TxBuilder {
                 signatures: vec![signature.serialize_compact().to_vec()],
             };
 
+            let mk_action = move || Action::Broadcast {
+                txbuilder: self.clone(),
+                gas_wanted: gas_to_request,
+                fee: amount.clone(),
+            };
+
             let PerformQueryWrapper { grpc_url, tonic } = cosmos
                 .perform_query(
                     BroadcastTxRequest {
                         tx_bytes: tx.encode_to_vec(),
                         mode: BroadcastMode::Sync as i32,
                     },
-                    Action::Broadcast(self.clone()),
+                    mk_action(),
                     true,
                 )
                 .await?;
             let res = tonic.into_inner().tx_response.ok_or_else(|| {
                 crate::Error::InvalidChainResponse {
                     message: "Missing inner tx_response".to_owned(),
-                    action: Action::Broadcast(self.clone()),
+                    action: mk_action(),
                 }
             })?;
 
@@ -1540,7 +1547,7 @@ impl TxBuilder {
                     code: res.code.into(),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
-                    action: Action::Broadcast(self.clone()).into(),
+                    action: mk_action().into(),
                     grpc_url,
                     stage: crate::error::TransactionStage::Broadcast,
                 });
@@ -1549,14 +1556,14 @@ impl TxBuilder {
             tracing::debug!("Initial BroadcastTxResponse: {res:?}");
 
             let (_, res) = cosmos
-                .wait_for_transaction_with_action(res.txhash, Some(Action::Broadcast(self.clone())))
+                .wait_for_transaction_with_action(res.txhash, Some(mk_action()))
                 .await?;
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
                     code: res.code.into(),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
-                    action: Action::Broadcast(self.clone()).into(),
+                    action: mk_action().into(),
                     grpc_url,
                     stage: crate::error::TransactionStage::Wait,
                 });

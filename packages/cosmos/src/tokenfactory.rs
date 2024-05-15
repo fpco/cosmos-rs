@@ -77,7 +77,10 @@ impl TokenFactory {
             })
             .ok_or_else(|| crate::Error::InvalidChainResponse {
                 message: "Failed to get denom from tx events".to_owned(),
-                action: Action::Broadcast(txbuilder),
+                action: Action::TokenFactory {
+                    txbuilder,
+                    txhash: res.txhash.clone(),
+                },
             })?;
 
         Ok((res, denom))

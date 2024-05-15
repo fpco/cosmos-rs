@@ -109,7 +109,10 @@ impl CodeId {
             res.parse_first_instantiated_contract()
                 .map_err(|source| crate::Error::ChainParse {
                     source: source.into(),
-                    action: Action::Broadcast(txbuilder.clone()),
+                    action: Action::InstantiateContract {
+                        txbuilder: txbuilder.clone(),
+                        txhash: res.txhash.clone(),
+                    },
                 })?;
 
         if addr.get_address_hrp() == self.get_address_hrp() {
@@ -122,7 +125,10 @@ impl CodeId {
                     addr,
                     addr.get_address_hrp()
                 ),
-                action: Action::Broadcast(txbuilder),
+                action: Action::InstantiateContract {
+                    txbuilder,
+                    txhash: res.txhash,
+                },
             })
         }
     }
