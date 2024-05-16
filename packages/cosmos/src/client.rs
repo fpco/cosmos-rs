@@ -1624,7 +1624,7 @@ impl TxBuilder {
 
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
-                    code: res.code.into(),
+                    code: CosmosSdkError::from_code(res.code, &res.codespace),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
                     action: mk_action().into(),
@@ -1640,7 +1640,7 @@ impl TxBuilder {
                 .await?;
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
-                    code: res.code.into(),
+                    code: CosmosSdkError::from_code(res.code, &res.codespace),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
                     action: mk_action().into(),

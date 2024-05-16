@@ -415,7 +415,7 @@ pub enum QueryErrorDetails {
 /// Different known Cosmos SDK error codes
 ///
 /// We can expand this over time, just including the most common ones for now
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum CosmosSdkError {
     /// Code 4
     Unauthorized,
@@ -436,7 +436,7 @@ pub enum CosmosSdkError {
     /// Code 32
     IncorrectAccountSequence,
     /// Some other error code
-    Other(u32),
+    Other { code: u32, codespace: String },
 }
 
 impl Display for CosmosSdkError {
@@ -453,24 +453,36 @@ impl Display for CosmosSdkError {
             CosmosSdkError::IncorrectAccountSequence => {
                 f.write_str("incorrect account sequence (32)")
             }
-            CosmosSdkError::Other(code) => write!(f, "Cosmos SDK error {code}"),
+            CosmosSdkError::Other { code, codespace } => {
+                write!(f, "Cosmos SDK error {code} (codespace {codespace})")
+            }
         }
     }
 }
 
-impl From<u32> for CosmosSdkError {
-    fn from(value: u32) -> Self {
-        match value {
-            4 => Self::Unauthorized,
-            5 => Self::InsufficientFunds,
-            11 => Self::OutOfGas,
-            13 => Self::InsufficientFee,
-            19 => Self::TxInMempool,
-            21 => Self::TxTooLarge,
-            28 => Self::InvalidChainId,
-            30 => Self::TxTimeoutHeight,
-            32 => Self::IncorrectAccountSequence,
-            _ => Self::Other(value),
+impl CosmosSdkError {
+    pub fn from_code(code: u32, codespace: &str) -> CosmosSdkError {
+        if codespace == "sdk" {
+            match code {
+                4 => Self::Unauthorized,
+                5 => Self::InsufficientFunds,
+                11 => Self::OutOfGas,
+                13 => Self::InsufficientFee,
+                19 => Self::TxInMempool,
+                21 => Self::TxTooLarge,
+                28 => Self::InvalidChainId,
+                30 => Self::TxTimeoutHeight,
+                32 => Self::IncorrectAccountSequence,
+                _ => Self::Other {
+                    code,
+                    codespace: codespace.to_owned(),
+                },
+            }
+        } else {
+            Self::Other {
+                code,
+                codespace: codespace.to_owned(),
+            }
         }
     }
 }
@@ -555,7 +567,7 @@ impl QueryErrorDetails {
 
         if let Some(error_code) = extract_cosmos_sdk_error_code(err.message()) {
             return QueryErrorDetails::CosmosSdk {
-                error_code: CosmosSdkError::from(error_code),
+                error_code: CosmosSdkError::from_code(error_code, "wasm"),
                 source: err,
             };
         }
