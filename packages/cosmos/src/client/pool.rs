@@ -7,7 +7,10 @@ use crate::{
     CosmosBuilder,
 };
 
-use super::{node::Node, node_chooser::NodeChooser};
+use super::{
+    node::Node,
+    node_chooser::{AllNodes, NodeChooser},
+};
 
 #[derive(Clone)]
 pub(super) struct Pool {
@@ -54,6 +57,13 @@ impl Pool {
         })
     }
 
+    pub(super) fn all_nodes(&self) -> AllNodeGuards {
+        AllNodeGuards {
+            pool: self,
+            all_nodes: self.node_chooser.all_nodes(),
+        }
+    }
+
     pub(crate) async fn get_with_node(&self, node: &Node) -> Result<NodeGuard, ConnectionError> {
         let permit = self
             .semaphore
@@ -66,5 +76,25 @@ impl Pool {
             inner: node.clone(),
             _permit: permit,
         })
+    }
+}
+
+pub(crate) struct AllNodeGuards<'a> {
+    pool: &'a Pool,
+    all_nodes: AllNodes<'a>,
+}
+
+impl AllNodeGuards<'_> {
+    pub(crate) async fn next(&mut self) -> Option<NodeGuard> {
+        let inner = self.all_nodes.next()?.clone();
+        let _permit = self
+            .pool
+            .semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .expect("AllNodeGuards::next: semaphore has been closed");
+
+        Some(NodeGuard { inner, _permit })
     }
 }

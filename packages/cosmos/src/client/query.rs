@@ -33,8 +33,8 @@ use crate::osmosis::{
 use super::node::Node;
 
 #[async_trait]
-pub(crate) trait GrpcRequest: Clone + Sized {
-    type Response;
+pub(crate) trait GrpcRequest: Clone + Sized + Send + 'static {
+    type Response: Send;
 
     async fn perform(
         req: tonic::Request<Self>,
