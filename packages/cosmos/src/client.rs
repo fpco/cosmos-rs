@@ -152,6 +152,7 @@ pub(crate) struct PerformQueryBuilder<'a, Request> {
     req: Request,
     action: Action,
     should_retry: bool,
+    all_nodes: bool,
 }
 
 impl<Request: GrpcRequest> PerformQueryBuilder<'_, Request> {
@@ -161,6 +162,11 @@ impl<Request: GrpcRequest> PerformQueryBuilder<'_, Request> {
 
     pub(crate) fn no_retry(mut self) -> Self {
         self.should_retry = false;
+        self
+    }
+
+    fn all_nodes(mut self) -> Self {
+        self.all_nodes = true;
         self
     }
 }
@@ -320,6 +326,7 @@ impl Cosmos {
             req,
             action,
             should_retry: true,
+            all_nodes: false,
         }
     }
 
@@ -329,6 +336,7 @@ impl Cosmos {
             req,
             action,
             should_retry,
+            all_nodes,
         }: PerformQueryBuilder<'_, Request>,
     ) -> Result<PerformQueryWrapper<Request::Response>, QueryError> {
         let mut attempt = 0;
@@ -343,6 +351,32 @@ impl Cosmos {
                     let cosmos_inner = guard.get_inner_mut();
                     if cosmos.pool.builder.get_log_requests() {
                         tracing::info!("{action}");
+                    }
+                    if all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast() {
+                        tracing::debug!("Initiating all-nodes broadcast");
+                        let cosmos = cosmos.clone();
+                        let req = req.clone();
+                        let grpc_url = cosmos_inner.grpc_url().clone();
+                        tokio::spawn(async move {
+                            let mut all_nodes = cosmos.pool.all_nodes();
+                            while let Some(mut guard) = all_nodes.next().await {
+                                let cosmos_inner = guard.get_inner_mut();
+                                if cosmos_inner.grpc_url() == &grpc_url {
+                                    continue;
+                                }
+                                match cosmos.perform_query_inner(req.clone(), cosmos_inner).await {
+                                    Ok(_) => tracing::debug!(
+                                        "Successfully performed an all-nodes broadcast to {}",
+                                        cosmos_inner.grpc_url(),
+                                    ),
+                                    Err((err, _)) => {
+                                        tracing::debug!(
+                                            "Failed doing an all-nodes broadcast: {err}"
+                                        )
+                                    }
+                                }
+                            }
+                        });
                     }
                     match cosmos.perform_query_inner(req.clone(), cosmos_inner).await {
                         Ok(x) => {
@@ -366,6 +400,7 @@ impl Cosmos {
                     }
                 }
             };
+
             if attempt >= cosmos.pool.builder.query_retries() || !should_retry || !can_retry {
                 break Err(QueryError {
                     action,
@@ -1577,6 +1612,7 @@ impl TxBuilder {
                     },
                     mk_action(),
                 )
+                .all_nodes()
                 .run()
                 .await?;
             let res = tonic.into_inner().tx_response.ok_or_else(|| {

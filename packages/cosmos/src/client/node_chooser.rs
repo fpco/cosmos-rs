@@ -65,8 +65,11 @@ impl NodeChooser {
         }
     }
 
-    pub(super) fn all_nodes(&self) -> impl Iterator<Item = &Node> {
-        std::iter::once(&*self.primary).chain(self.fallbacks.iter())
+    pub(super) fn all_nodes(&self) -> AllNodes {
+        AllNodes {
+            primary: Some(&self.primary),
+            fallbacks: self.fallbacks.iter(),
+        }
     }
 }
 
@@ -77,4 +80,20 @@ pub(crate) enum QueryResult {
         action: Action,
     },
     OtherError,
+}
+
+pub(crate) struct AllNodes<'a> {
+    primary: Option<&'a Node>,
+    fallbacks: std::slice::Iter<'a, Node>,
+}
+
+impl<'a> Iterator for AllNodes<'a> {
+    type Item = &'a Node;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.primary.take() {
+            Some(primary) => Some(primary),
+            None => self.fallbacks.next(),
+        }
+    }
 }

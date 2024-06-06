@@ -46,6 +46,7 @@ pub struct CosmosBuilder {
     rate_limit_per_second: Option<u64>,
     log_requests: Option<bool>,
     max_decoding_message_size: Option<usize>,
+    all_nodes_broadcast: bool,
 }
 
 impl CosmosBuilder {
@@ -86,6 +87,7 @@ impl CosmosBuilder {
             is_fast_chain: matches!(hrp.as_str(), "sei" | "inj"),
             log_requests: None,
             max_decoding_message_size: None,
+            all_nodes_broadcast: true,
         }
     }
 
@@ -452,6 +454,21 @@ impl CosmosBuilder {
     /// See [Self::get_max_decoding_message_size]
     pub fn set_max_decoding_message_size(&mut self, max_decoding_message_size: usize) {
         self.max_decoding_message_size = Some(max_decoding_message_size);
+    }
+
+    /// When broadcasting transactions, should we also broadcast to all fallback nodes?
+    ///
+    /// This is intended to work around cases where broadcasting to the primary
+    /// node is failing, but other kinds of queries are working.
+    ///
+    /// Default: [true]
+    pub fn get_all_nodes_broadcast(&self) -> bool {
+        self.all_nodes_broadcast
+    }
+
+    /// See [Self::get_all_nodes_broadcast]
+    pub fn set_all_nodes_broadcast(&mut self, value: bool) {
+        self.all_nodes_broadcast = value;
     }
 }
 
