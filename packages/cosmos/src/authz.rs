@@ -40,7 +40,8 @@ impl Cosmos {
                 mut grants,
                 pagination: pag_res,
             } = self
-                .perform_query(req, Action::QueryGranterGrants(granter.get_address()), true)
+                .perform_query(req, Action::QueryGranterGrants(granter.get_address()))
+                .run()
                 .await?
                 .into_inner();
             println!("{grants:?}");

@@ -23,26 +23,20 @@ impl Cosmos {
     ///
     /// Note that this query will fail if called on chains besides Osmosis Mainnet.
     pub async fn get_osmosis_epoch_info(&self) -> Result<EpochsInfo, QueryError> {
-        self.perform_query(
-            epochs::QueryEpochsInfoRequest {},
-            Action::OsmosisEpochsInfo,
-            true,
-        )
-        .await
-        .map(|res| EpochsInfo {
-            epochs: res.into_inner().epochs,
-        })
+        self.perform_query(epochs::QueryEpochsInfoRequest {}, Action::OsmosisEpochsInfo)
+            .run()
+            .await
+            .map(|res| EpochsInfo {
+                epochs: res.into_inner().epochs,
+            })
     }
     /// Get the Osmosis txfees information.
     ///
     /// Note that this query will fail if called on chains besides Osmosis Mainnet.
     pub async fn get_osmosis_txfees_info(&self) -> Result<TxFeesInfo, Error> {
         let eip_base_fee = self
-            .perform_query(
-                txfees::QueryEipBaseFeeRequest {},
-                Action::OsmosisTxFeesInfo,
-                true,
-            )
+            .perform_query(txfees::QueryEipBaseFeeRequest {}, Action::OsmosisTxFeesInfo)
+            .run()
             .await
             .map(|res| res.into_inner())?;
 
