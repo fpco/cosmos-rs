@@ -224,8 +224,8 @@ impl Contract {
                     contract: self.address,
                     key: key.into(),
                 },
-                true,
             )
+            .run()
             .await?
             .into_inner()
             .data)
@@ -261,8 +261,8 @@ impl Contract {
                     contract: self.address,
                     message: msg.into(),
                 },
-                true,
             )
+            .run()
             .await?
             .into_inner();
         Ok(res.data)
@@ -294,8 +294,8 @@ impl Contract {
                     query_data: msg,
                 },
                 action.clone(),
-                true,
             )
+            .run()
             .await?
             .into_inner();
         serde_json::from_slice(&res.data).map_err(|source| crate::Error::JsonDeserialize {
@@ -341,8 +341,8 @@ impl Contract {
                     address: self.address.into(),
                 },
                 action.clone(),
-                true,
             )
+            .run()
             .await?
             .into_inner()
             .contract_info
@@ -362,8 +362,8 @@ impl Contract {
                     pagination: None,
                 },
                 Action::ContractHistory(self.address),
-                true,
             )
+            .run()
             .await?
             .into_inner())
     }
