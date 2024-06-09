@@ -1622,7 +1622,21 @@ impl TxBuilder {
                 }
             })?;
 
-            if !self.skip_code_check && res.code != 0 {
+            // Check if the transaction was successfully broadcast. We have three
+            // ways for this to "succeed":
+            //
+            // 1. We've decided to skip checking the code entirely.
+            // 2. The broadcast succeeded (status 0)
+            // 3. The broadcast failed with code 19, meaning "already in mempool"
+            //
+            // Our assumption with (3) is that we don't care about reporting if
+            // the tx is already in the pool, we just want to wait for it to be
+            // included in a block. Note that it's common for code 19 to occur
+            // when using all-node broadcasting.
+            if !(self.skip_code_check
+                || res.code == 0
+                || (res.codespace == "sdk" && res.code == 19))
+            {
                 return Err(crate::Error::TransactionFailed {
                     code: CosmosSdkError::from_code(res.code, &res.codespace),
                     txhash: res.txhash.clone(),
