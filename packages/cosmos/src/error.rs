@@ -283,6 +283,7 @@ pub enum Action {
         txbuilder: TxBuilder,
         txhash: String,
     },
+    BroadcastRaw,
 }
 
 impl Display for Action {
@@ -329,6 +330,7 @@ impl Display for Action {
                 f,
                 "perform token factory operation in {txhash}: {txbuilder}"
             ),
+            Action::BroadcastRaw => f.write_str("broadcasting a raw transaction"),
         }
     }
 }

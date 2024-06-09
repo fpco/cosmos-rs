@@ -20,9 +20,9 @@ use cosmos_sdk_proto::{
             v1beta1::Coin,
         },
         tx::v1beta1::{
-            AuthInfo, BroadcastMode, BroadcastTxRequest, Fee, GetTxRequest, GetTxResponse,
-            GetTxsEventRequest, ModeInfo, OrderBy, SignDoc, SignerInfo, SimulateRequest,
-            SimulateResponse, Tx, TxBody,
+            AuthInfo, BroadcastMode, BroadcastTxRequest, BroadcastTxResponse, Fee, GetTxRequest,
+            GetTxResponse, GetTxsEventRequest, ModeInfo, OrderBy, SignDoc, SignerInfo,
+            SimulateRequest, SimulateResponse, Tx, TxBody,
         },
     },
     cosmwasm::wasm::v1::QueryCodeRequest,
@@ -1158,6 +1158,47 @@ impl Cosmos {
                 high = mid;
             }
         }
+    }
+
+    /// Helper function: parse out a raw transaction from encoded bytes.
+    ///
+    /// This is useful in parsing a transaction created from a frontend.
+    pub fn parse_tx_from_bytes<BodyBytes, AuthInfoBytes, Signatures, Signature>(
+        body_bytes: BodyBytes,
+        auth_info_bytes: AuthInfoBytes,
+        signatures: Signatures,
+    ) -> Result<Tx, prost::DecodeError>
+    where
+        BodyBytes: AsRef<[u8]>,
+        AuthInfoBytes: AsRef<[u8]>,
+        Signatures: IntoIterator<Item = Signature>,
+        Signature: AsRef<[u8]>,
+    {
+        Ok(Tx {
+            body: Some(TxBody::decode(body_bytes.as_ref())?),
+            auth_info: Some(AuthInfo::decode(auth_info_bytes.as_ref())?),
+            signatures: signatures
+                .into_iter()
+                .map(|signature| signature.as_ref().to_owned())
+                .collect(),
+        })
+    }
+
+    /// Attempt to broadcast a fully formed [Tx]
+    pub async fn broadcast_tx_raw(&self, tx: Tx) -> Result<BroadcastTxResponse, QueryError> {
+        let mk_action = move || Action::BroadcastRaw;
+        let PerformQueryWrapper { grpc_url: _, tonic } = self
+            .perform_query(
+                BroadcastTxRequest {
+                    tx_bytes: tx.encode_to_vec(),
+                    mode: BroadcastMode::Sync as i32,
+                },
+                mk_action(),
+            )
+            .all_nodes()
+            .run()
+            .await?;
+        Ok(tonic.into_inner())
     }
 }
 
