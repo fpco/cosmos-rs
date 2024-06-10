@@ -14,7 +14,7 @@ pub(super) struct NodeChooser {
     primary: Arc<Node>,
     fallbacks: Arc<[Node]>,
     /// How many errors in a row are allowed before we call a node unhealthy?
-    allowed_error_count: usize,
+    pub(crate) allowed_error_count: usize,
 }
 
 impl NodeChooser {

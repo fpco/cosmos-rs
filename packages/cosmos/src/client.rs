@@ -34,6 +34,7 @@ use tonic::{service::Interceptor, Status};
 
 use crate::{
     address::HasAddressHrp,
+    client::node::NodeHealthLevel,
     error::{
         Action, BuilderError, ConnectionError, CosmosSdkError, FirstBlockAfterError,
         NodeHealthReport, QueryError, QueryErrorCategory, QueryErrorDetails,
@@ -357,12 +358,18 @@ impl Cosmos {
                         let cosmos = cosmos.clone();
                         let req = req.clone();
                         let grpc_url = cosmos_inner.grpc_url().clone();
+                        let allowed_error_count = cosmos.pool.node_chooser.allowed_error_count;
                         tokio::spawn(async move {
                             let mut all_nodes = cosmos.pool.all_nodes();
                             while let Some(mut guard) = all_nodes.next().await {
                                 let cosmos_inner = guard.get_inner_mut();
                                 if cosmos_inner.grpc_url() == &grpc_url {
                                     continue;
+                                }
+                                match cosmos_inner.is_healthy(allowed_error_count) {
+                                    NodeHealthLevel::Healthy | NodeHealthLevel::Unhealthy => (),
+                                    // Don't use a node which is rate limiting us
+                                    NodeHealthLevel::Blocked => continue,
                                 }
                                 match cosmos.perform_query_inner(req.clone(), cosmos_inner).await {
                                     Ok(_) => tracing::debug!(
