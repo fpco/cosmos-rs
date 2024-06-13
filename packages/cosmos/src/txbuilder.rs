@@ -81,6 +81,22 @@ impl TxBuilder {
         }))
     }
 
+    /// Add an execute message on a contract, but using raw bytes for input.
+    pub fn add_execute_message_bytes(
+        &mut self,
+        contract: impl HasAddress,
+        wallet: impl HasAddress,
+        funds: Vec<Coin>,
+        msg: impl Into<Vec<u8>>,
+    ) -> Result<&mut Self, serde_json::Error> {
+        Ok(self.add_message(MsgExecuteContract {
+            sender: wallet.get_address_string(),
+            contract: contract.get_address_string(),
+            msg: msg.into(),
+            funds,
+        }))
+    }
+
     /// Add a contract migration message.
     pub fn add_migrate_message(
         &mut self,
