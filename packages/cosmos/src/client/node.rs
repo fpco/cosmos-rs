@@ -125,8 +125,6 @@ impl CosmosBuilder {
             grpc_endpoint
         };
 
-        let grpc_endpoint = grpc_endpoint.http2_keep_alive_interval(Duration::from_secs(20));
-
         let grpc_endpoint = if let Some(rate_limit) = self.rate_limit() {
             grpc_endpoint.rate_limit(rate_limit, Duration::from_secs(rate_limit))
         } else {
