@@ -47,6 +47,8 @@ pub struct CosmosBuilder {
     log_requests: Option<bool>,
     max_decoding_message_size: Option<usize>,
     all_nodes_broadcast: bool,
+    http2_keep_alive_interval: Option<Duration>,
+    keep_alive_while_idle: Option<bool>,
 }
 
 impl CosmosBuilder {
@@ -88,6 +90,8 @@ impl CosmosBuilder {
             log_requests: None,
             max_decoding_message_size: None,
             all_nodes_broadcast: true,
+            http2_keep_alive_interval: None,
+            keep_alive_while_idle: None,
         }
     }
 
@@ -469,6 +473,32 @@ impl CosmosBuilder {
     /// See [Self::get_all_nodes_broadcast]
     pub fn set_all_nodes_broadcast(&mut self, value: bool) {
         self.all_nodes_broadcast = value;
+    }
+
+    /// Sets an interval for HTTP2 Ping frames should be sent to keep
+    /// a connection alive.
+    ///
+    /// Uses hyper’s default otherwise.
+    pub fn set_http2_keep_alive_interval(&mut self, value: Duration) {
+        self.http2_keep_alive_interval = Some(value)
+    }
+
+    /// See [Self::set_http2_keep_alive_interval]
+    pub fn get_http2_keep_alive_interval(&self) -> Option<Duration> {
+        self.http2_keep_alive_interval
+    }
+
+    /// Sets whether HTTP2 keep-alive should apply while the
+    /// connection is idle.
+    ///
+    /// Uses hyper’s default otherwise.
+    pub fn set_keep_alive_while_idle(&mut self) {
+        self.keep_alive_while_idle = Some(true)
+    }
+
+    /// See [Self::set_keep_alive_while_idle]
+    pub fn get_keep_alive_while_idle(&self) -> Option<bool> {
+        self.keep_alive_while_idle
     }
 }
 

@@ -112,6 +112,19 @@ impl CosmosBuilder {
         // https://github.com/hyperium/tonic/issues/1033#issuecomment-1537239811
         let grpc_endpoint = grpc_endpoint.origin(uri);
 
+        let grpc_endpoint =
+            if let Some(http2_keep_alive_interval) = self.get_http2_keep_alive_interval() {
+                grpc_endpoint.http2_keep_alive_interval(http2_keep_alive_interval)
+            } else {
+                grpc_endpoint
+            };
+
+        let grpc_endpoint = if let Some(keep_alive_while_idle) = self.get_keep_alive_while_idle() {
+            grpc_endpoint.keep_alive_while_idle(keep_alive_while_idle)
+        } else {
+            grpc_endpoint
+        };
+
         let grpc_endpoint = if let Some(rate_limit) = self.rate_limit() {
             grpc_endpoint.rate_limit(rate_limit, Duration::from_secs(rate_limit))
         } else {
