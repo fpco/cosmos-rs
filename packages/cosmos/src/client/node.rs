@@ -189,13 +189,15 @@ impl Node {
         self.log_connection_error(err, details);
     }
 
-    pub(super) fn log_connection_error(&self, error: ConnectionError, details: &QueryErrorDetails) {
-        *self.node_inner.last_error.write() = Some(LastError {
+    fn log_connection_error(&self, error: ConnectionError, details: &QueryErrorDetails) {
+        let mut guard = self.node_inner.last_error.write();
+        let old_error_count = guard.as_ref().map_or(0, |x| x.error_count);
+        *guard = Some(LastError {
             error: error.to_string().into(),
             instant: Instant::now(),
             timestamp: Utc::now(),
             action: None,
-            error_count: 1,
+            error_count: old_error_count + 1,
             blocked: details.is_blocked(),
         });
     }
