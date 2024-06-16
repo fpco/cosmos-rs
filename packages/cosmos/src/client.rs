@@ -1527,12 +1527,20 @@ impl TxBuilder {
         sequences: &[u64],
     ) -> Result<FullSimulateResponse, crate::Error> {
         let body = self.make_tx_body();
+        let gas_coin = cosmos.pool.builder.gas_coin();
 
         // First simulate the request with no signature and fake gas
         let simulate_tx = Tx {
             auth_info: Some(AuthInfo {
                 fee: Some(Fee {
-                    amount: vec![],
+                    amount: if cosmos.pool.builder.get_simulate_with_gas_coin() {
+                        vec![Coin {
+                            denom: gas_coin.to_owned(),
+                            amount: "1".to_owned(),
+                        }]
+                    } else {
+                        vec![]
+                    },
                     gas_limit: 0,
                     payer: "".to_owned(),
                     granter: "".to_owned(),
