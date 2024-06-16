@@ -32,14 +32,27 @@ impl NodeChooser {
     }
 
     pub(super) fn choose_node(&self) -> Result<&Node, ConnectionError> {
-        let primary_health = self.primary.is_healthy(self.allowed_error_count);
+        // First we try to find a node that has had no issues at all.
+        // If that fails, then we go for the allowed error count.
+        // Motivation: we previously had issues where we would retry the primary
+        // node multiple times, exhausting our retry counts, and never fall
+        // back to another node.
+        self.choose_node_with_allowed(0)
+            .or_else(|_| self.choose_node_with_allowed(self.allowed_error_count))
+    }
+
+    fn choose_node_with_allowed(
+        &self,
+        allowed_error_count: usize,
+    ) -> Result<&Node, ConnectionError> {
+        let primary_health = self.primary.is_healthy(allowed_error_count);
         if primary_health.is_healthy() {
             Ok(&self.primary)
         } else {
             let fallbacks = self
                 .fallbacks
                 .iter()
-                .filter(|node| node.is_healthy(self.allowed_error_count).is_healthy())
+                .filter(|node| node.is_healthy(allowed_error_count).is_healthy())
                 .collect::<Vec<_>>();
 
             let mut rng = rand::thread_rng();
