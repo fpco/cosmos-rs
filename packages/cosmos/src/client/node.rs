@@ -36,7 +36,7 @@ struct NodeInner {
     simulate_sequences: RwLock<HashMap<Address, SequenceInformation>>,
     broadcast_sequences: RwLock<HashMap<Address, SequenceInformation>>,
     query_count: RwLock<QueryCount>,
-    max_decoding_message_size: Option<usize>,
+    max_decoding_message_size: usize,
 }
 
 #[derive(Default)]
@@ -272,10 +272,7 @@ impl Node {
         let client = cosmos_sdk_proto::cosmos::auth::v1beta1::query_client::QueryClient::new(
             self.node_inner.channel.clone(),
         );
-        if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size);
-        }
-        client
+        client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
     }
 
     pub(crate) fn bank_query_client(
@@ -284,10 +281,7 @@ impl Node {
         let client = cosmos_sdk_proto::cosmos::bank::v1beta1::query_client::QueryClient::new(
             self.node_inner.channel.clone(),
         );
-        if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size);
-        }
-        client
+        client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
     }
 
     pub(crate) fn wasm_query_client(
@@ -296,10 +290,7 @@ impl Node {
         let client = cosmos_sdk_proto::cosmwasm::wasm::v1::query_client::QueryClient::new(
             self.node_inner.channel.clone(),
         );
-        if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size);
-        }
-        client
+        client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
     }
 
     pub(crate) fn tx_service_client(
@@ -308,10 +299,7 @@ impl Node {
         let client = cosmos_sdk_proto::cosmos::tx::v1beta1::service_client::ServiceClient::new(
             self.node_inner.channel.clone(),
         );
-        if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size);
-        }
-        client
+        client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
     }
 
     pub(crate) fn tendermint_client(
@@ -323,10 +311,7 @@ impl Node {
             cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::service_client::ServiceClient::new(
                 self.node_inner.channel.clone(),
             );
-        if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size);
-        }
-        client
+        client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
     }
 
     pub(crate) fn authz_query_client(
@@ -335,10 +320,7 @@ impl Node {
         let client = cosmos_sdk_proto::cosmos::authz::v1beta1::query_client::QueryClient::new(
             self.node_inner.channel.clone(),
         );
-        if let Some(max_decoding_message_size) = self.node_inner.max_decoding_message_size {
-            return client.max_decoding_message_size(max_decoding_message_size);
-        }
-        client
+        client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
     }
 
     pub(crate) fn epochs_query_client(
