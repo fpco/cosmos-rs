@@ -454,9 +454,9 @@ impl CosmosBuilder {
 
     /// Limits the maximum size of a decoded message.
     ///
-    /// Default: 4 MB
-    pub fn get_max_decoding_message_size(&self) -> Option<usize> {
-        self.max_decoding_message_size
+    /// Default: 16 MB
+    pub fn get_max_decoding_message_size(&self) -> usize {
+        self.max_decoding_message_size.unwrap_or(16 * 1024 * 1024)
     }
 
     /// See [Self::get_max_decoding_message_size]
