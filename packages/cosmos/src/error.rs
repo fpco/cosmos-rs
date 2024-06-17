@@ -412,6 +412,8 @@ pub enum QueryErrorDetails {
     RateLimited { source: tonic::Status },
     #[error("The gRPC server is returning a 'forbidden' response: {source:?}")]
     Forbidden { source: tonic::Status },
+    #[error("Server returned response that does not look like valid gRPC: {source:?}")]
+    NotGrpc { source: tonic::Status },
 }
 
 /// Different known Cosmos SDK error codes
@@ -540,6 +542,7 @@ impl QueryErrorDetails {
             QueryErrorDetails::AccountSequenceMismatch { .. } => ConnectionIsFine,
             QueryErrorDetails::RateLimited { .. } => NetworkIssue,
             QueryErrorDetails::Forbidden { .. } => NetworkIssue,
+            QueryErrorDetails::NotGrpc { .. } => NetworkIssue,
         }
     }
 
@@ -605,6 +608,14 @@ impl QueryErrorDetails {
             };
         }
 
+        if err.message().contains("status: 405") {
+            return QueryErrorDetails::NotGrpc { source: err };
+        }
+
+        if err.message().contains("invalid compression flag") {
+            return QueryErrorDetails::NotGrpc { source: err };
+        }
+
         QueryErrorDetails::Unknown(err)
     }
 
@@ -623,7 +634,8 @@ impl QueryErrorDetails {
             | QueryErrorDetails::TransportError { .. }
             | QueryErrorDetails::BlocksLagDetected { .. }
             | QueryErrorDetails::NoNewBlockFound { .. }
-            | QueryErrorDetails::AccountSequenceMismatch(_) => false,
+            | QueryErrorDetails::AccountSequenceMismatch(_)
+            | QueryErrorDetails::NotGrpc { .. } => false,
             QueryErrorDetails::RateLimited { .. } | QueryErrorDetails::Forbidden { .. } => true,
         }
     }
