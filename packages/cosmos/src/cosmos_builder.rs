@@ -49,6 +49,7 @@ pub struct CosmosBuilder {
     all_nodes_broadcast: bool,
     http2_keep_alive_interval: Option<Duration>,
     keep_alive_while_idle: Option<bool>,
+    simulate_with_gas_coin: bool,
 }
 
 impl CosmosBuilder {
@@ -59,10 +60,12 @@ impl CosmosBuilder {
         hrp: AddressHrp,
         grpc_url: impl Into<String>,
     ) -> CosmosBuilder {
+        let chain_id = chain_id.into();
+        let simulate_with_gas_coin = chain_id == "pion-1";
         Self {
             grpc_url: Arc::new(grpc_url.into()),
             grpc_fallback_urls: vec![],
-            chain_id: chain_id.into(),
+            chain_id,
             gas_coin: gas_coin.into(),
             hrp,
             gas_estimate_multiplier: GasMultiplierConfig::Default,
@@ -92,6 +95,7 @@ impl CosmosBuilder {
             all_nodes_broadcast: true,
             http2_keep_alive_interval: None,
             keep_alive_while_idle: None,
+            simulate_with_gas_coin,
         }
     }
 
@@ -499,6 +503,19 @@ impl CosmosBuilder {
     /// See [Self::set_keep_alive_while_idle]
     pub fn get_keep_alive_while_idle(&self) -> Option<bool> {
         self.keep_alive_while_idle
+    }
+
+    /// When simulating transactions, do we include a fee with the gas coin?
+    ///
+    /// Most networks do not require this. However, Neutron Testnet started requiring
+    /// this some time around June 2024.
+    pub fn get_simulate_with_gas_coin(&self) -> bool {
+        self.simulate_with_gas_coin
+    }
+
+    /// See [Self::get_simulate_with_gas_coin]
+    pub fn set_simulate_with_gas_coin(&mut self, value: bool) {
+        self.simulate_with_gas_coin = value;
     }
 }
 
