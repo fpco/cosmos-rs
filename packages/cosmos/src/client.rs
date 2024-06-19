@@ -338,6 +338,23 @@ impl Cosmos {
             all_nodes,
         }: PerformQueryBuilder<'_, Request>,
     ) -> Result<PerformQueryWrapper<Request::Response>, QueryError> {
+        struct DropDetect {
+            should_talk: bool,
+        }
+        impl Drop for DropDetect {
+            fn drop(&mut self) {
+                if self.should_talk {
+                    println!("Drop detected in run_query")
+                }
+            }
+        }
+        impl DropDetect {
+            fn quiet(&mut self) {
+                self.should_talk = false;
+            }
+        }
+        let mut drop_detect = DropDetect { should_talk: true };
+
         // If we're broadcasting a transaction and want to use all nodes,
         // first we kick off a task to broadcast to all nodes.
         // This is redundant with our broadcasts below, perhaps in the future
@@ -405,6 +422,7 @@ impl Cosmos {
                 Ok(x) => {
                     tracing::info!("Successfully ran query against {}", node.grpc_url());
                     node.log_query_result(QueryResult::Success);
+                    drop_detect.quiet();
                     return Ok(PerformQueryWrapper {
                         grpc_url: node.grpc_url().clone(),
                         tonic: x,
@@ -412,7 +430,7 @@ impl Cosmos {
                 }
                 Err((err, can_retry)) => {
                     tracing::info!(
-                        "Error running query against {}. can_retry: {can_retry}: {err}",
+                        "Error running query against {}. can_retry: {can_retry}. should_retry: {should_retry}. {err}",
                         node.grpc_url()
                     );
                     node.log_query_result(if can_retry {
@@ -434,6 +452,7 @@ impl Cosmos {
                     }
 
                     if !can_retry || !should_retry {
+                        println!("Not going to retry. can_retry == {can_retry}. should_retry == {should_retry}.");
                         break;
                     }
                 }
@@ -458,6 +477,7 @@ impl Cosmos {
                 cosmos.get_cosmos_builder().grpc_url_arc().clone(),
             ),
         };
+        drop_detect.quiet();
         Err(QueryError {
             action,
             builder: cosmos.pool.builder.clone(),
