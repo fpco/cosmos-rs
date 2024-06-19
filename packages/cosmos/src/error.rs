@@ -256,6 +256,10 @@ pub enum Action {
         gas_wanted: u64,
         fee: cosmos_sdk_proto::cosmos::base::v1beta1::Coin,
     },
+    WaitForBroadcast {
+        txbuilder: TxBuilder,
+        txhash: String,
+    },
     RawQuery {
         contract: Address,
         key: StringOrBytes,
@@ -329,6 +333,9 @@ impl Display for Action {
                 "perform token factory operation in {txhash}: {txbuilder}"
             ),
             Action::BroadcastRaw => f.write_str("broadcasting a raw transaction"),
+            Action::WaitForBroadcast { txbuilder, txhash } => {
+                write!(f, "waiting for transaction {txhash} to land: {txbuilder}")
+            }
         }
     }
 }

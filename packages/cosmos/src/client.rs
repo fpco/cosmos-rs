@@ -873,6 +873,7 @@ impl Cosmos {
                 },
                 action.clone(),
             )
+            .no_retry()
             .run()
             .await;
         match res {
@@ -924,7 +925,6 @@ impl Cosmos {
                         .clone()
                         .unwrap_or_else(|| Action::WaitForTransaction(txhash.clone())),
                 )
-                .no_retry()
                 .run()
                 .await;
             match txres {
@@ -1189,14 +1189,13 @@ impl Cosmos {
 
     /// Attempt to broadcast a fully formed [Tx]
     pub async fn broadcast_tx_raw(&self, tx: Tx) -> Result<BroadcastTxResponse, QueryError> {
-        let mk_action = move || Action::BroadcastRaw;
         let PerformQueryWrapper { grpc_url: _, tonic } = self
             .perform_query(
                 BroadcastTxRequest {
                     tx_bytes: tx.encode_to_vec(),
                     mode: BroadcastMode::Sync as i32,
                 },
-                mk_action(),
+                Action::BroadcastRaw,
             )
             .all_nodes()
             .run()
@@ -1701,15 +1700,20 @@ impl TxBuilder {
 
             tracing::debug!("Initial BroadcastTxResponse: {res:?}");
 
+            let action = Action::WaitForBroadcast {
+                txbuilder: self.clone(),
+                txhash: res.txhash.clone(),
+            };
+
             let (_, res) = cosmos
-                .wait_for_transaction_with_action(res.txhash, Some(mk_action()))
+                .wait_for_transaction_with_action(res.txhash, Some(action.clone()))
                 .await?;
             if !self.skip_code_check && res.code != 0 {
                 return Err(crate::Error::TransactionFailed {
                     code: CosmosSdkError::from_code(res.code, &res.codespace),
                     txhash: res.txhash.clone(),
                     raw_log: res.raw_log,
-                    action: mk_action().into(),
+                    action: action.into(),
                     grpc_url,
                     stage: crate::error::TransactionStage::Wait,
                 });
