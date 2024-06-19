@@ -69,7 +69,7 @@ impl CosmosNetwork {
 
     /// Convenience method to make a [Self::builder] and then [CosmosBuilder::build] it.
     pub async fn connect(self) -> Result<Cosmos, BuilderError> {
-        self.builder().await?.build().await
+        self.builder().await?.build()
     }
 
     /// Construct a [CosmosBuilder] for this network with default values.

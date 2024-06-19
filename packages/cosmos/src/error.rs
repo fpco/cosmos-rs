@@ -268,7 +268,6 @@ pub enum Action {
     ContractHistory(Address),
     GetEarliestBlock,
     WaitForTransaction(String),
-    SanityCheck,
     OsmosisEpochsInfo,
     OsmosisTxFeesInfo,
     StoreCode {
@@ -317,7 +316,6 @@ impl Display for Action {
             Action::ContractHistory(address) => write!(f, "contract history for {address}"),
             Action::GetEarliestBlock => f.write_str("get earliest block"),
             Action::WaitForTransaction(txhash) => write!(f, "wait for transaction {txhash}"),
-            Action::SanityCheck => f.write_str("sanity check"),
             Action::OsmosisEpochsInfo => f.write_str("get Osmosis epochs info"),
             Action::OsmosisTxFeesInfo => f.write_str("get Osmosis txfees info"),
             Action::StoreCode { txbuilder, txhash } => {

@@ -126,7 +126,7 @@ impl CosmosOpt {
     pub async fn build(self) -> Result<Cosmos, CosmosOptError> {
         self.into_builder()
             .await?
-            .build_lazy()
+            .build()
             .map_err(|source| CosmosOptError::CosmosBuilderError { source })
     }
 }
