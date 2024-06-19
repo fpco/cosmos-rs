@@ -443,7 +443,11 @@ impl Cosmos {
         // If we did an all-nodes broadcast and one was successful, use it.
         if let Some(handle) = all_nodes_handle {
             if let Ok(Some(res)) = handle.await {
-                return Ok(res);
+                tracing::info!(
+                    "Successful all-nodes broadcast, but ignoring for debugging: {}",
+                    res.grpc_url
+                );
+                // return Ok(res);
             }
         }
 
