@@ -1824,14 +1824,12 @@ mod tests {
     }
 
     #[tokio::test]
-
     async fn lazy_load() {
         let mut builder = CosmosNetwork::OsmosisTestnet.builder().await.unwrap();
         builder.set_query_retries(Some(0));
         // something that clearly won't work
         builder.set_grpc_url("https://0.0.0.0:0".to_owned());
 
-        builder.clone().build().unwrap_err();
         let cosmos = builder.build().unwrap();
         cosmos.get_latest_block_info().await.unwrap_err();
     }
