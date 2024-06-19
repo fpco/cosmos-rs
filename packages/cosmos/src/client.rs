@@ -404,21 +404,30 @@ impl Cosmos {
 
         // We want to keep trying up to our total attempts amount.
         // We're willing to reuse nodes that we had tried previously.
-        let nodes = nodes.into_iter().cycle().take(total_attempts);
+        let nodes = nodes
+            .into_iter()
+            .cycle()
+            .take(total_attempts)
+            .collect::<Vec<_>>();
         let node_urls = nodes
-            .clone()
+            .iter()
             .map(|x| x.grpc_url().clone())
             .collect::<Vec<_>>();
         tracing::info!("Going to make {total_attempts} attempts. Nodes to use: {node_urls:?}");
+        println!("Another print of the nodes: {nodes:?}");
 
-        for (idx, node) in nodes.enumerate() {
-            tracing::info!("Attempt #{} against {}", idx + 1, node.grpc_url());
+        for (idx, node) in nodes.iter().enumerate() {
+            tracing::info!(
+                "Attempt #{} against {} ({action})",
+                idx + 1,
+                node.grpc_url()
+            );
             let _permit = cosmos.pool.get_node_permit().await;
             if cosmos.pool.builder.get_log_requests() {
                 tracing::info!("{action}");
             }
 
-            match cosmos.perform_query_inner(req.clone(), &node).await {
+            match cosmos.perform_query_inner(req.clone(), node).await {
                 Ok(x) => {
                     tracing::info!("Successfully ran query against {}", node.grpc_url());
                     node.log_query_result(QueryResult::Success);

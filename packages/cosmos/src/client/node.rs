@@ -27,6 +27,12 @@ pub(crate) struct Node {
     node_inner: Arc<NodeInner>,
 }
 
+impl std::fmt::Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.grpc_url())
+    }
+}
+
 struct NodeInner {
     grpc_url: Arc<String>,
     is_fallback: bool,
