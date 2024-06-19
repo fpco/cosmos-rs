@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
@@ -14,13 +13,13 @@ use tonic::{
 
 use crate::{
     error::{
-        Action, BuilderError, ConnectionError, LastNodeError, QueryErrorDetails,
+        Action, BuilderError, ConnectionError, LastNodeError, NodeHealthLevel, QueryErrorDetails,
         SingleNodeHealthReport,
     },
-    Address, CosmosBuilder,
+    CosmosBuilder,
 };
 
-use super::{node_chooser::QueryResult, CosmosInterceptor, SequenceInformation};
+use super::{node_chooser::QueryResult, CosmosInterceptor};
 
 /// Internal data structure containing gRPC clients.
 #[derive(Clone)]
@@ -33,8 +32,6 @@ struct NodeInner {
     is_fallback: bool,
     last_error: RwLock<Option<LastError>>,
     channel: InterceptedService<Channel, CosmosInterceptor>,
-    simulate_sequences: RwLock<HashMap<Address, SequenceInformation>>,
-    broadcast_sequences: RwLock<HashMap<Address, SequenceInformation>>,
     query_count: RwLock<QueryCount>,
     max_decoding_message_size: usize,
 }
@@ -69,23 +66,21 @@ struct LastError {
 }
 
 impl LastError {
-    fn is_healthy(&self, allowed_error_count: usize) -> NodeHealthLevel {
+    fn node_health_level(&self) -> NodeHealthLevel {
         const NODE_ERROR_TIMEOUT: u64 = 30;
 
         // If enough time has passed since the error, ignore it.
         if self.instant.elapsed().as_secs() > NODE_ERROR_TIMEOUT {
-            NodeHealthLevel::Healthy
+            NodeHealthLevel::Unblocked { error_count: 0 }
         }
         // If the error is a blocking error, we don't allow even a single error
         // through. Check that first.
         else if self.blocked {
             NodeHealthLevel::Blocked
-        }
-        // If there are enough errors mark as unhealthy
-        else if self.error_count > allowed_error_count {
-            NodeHealthLevel::Unhealthy
         } else {
-            NodeHealthLevel::Healthy
+            NodeHealthLevel::Unblocked {
+                error_count: self.error_count,
+            }
         }
     }
 }
@@ -154,8 +149,6 @@ impl CosmosBuilder {
             node_inner: Arc::new(NodeInner {
                 is_fallback,
                 channel,
-                simulate_sequences: RwLock::new(HashMap::new()),
-                broadcast_sequences: RwLock::new(HashMap::new()),
                 grpc_url: grpc_url.clone(),
                 last_error: RwLock::new(None),
                 query_count: RwLock::new(QueryCount::default()),
@@ -172,16 +165,8 @@ impl Node {
         &self.node_inner.grpc_url
     }
 
-    pub(crate) fn simulate_sequences(&self) -> &RwLock<HashMap<Address, SequenceInformation>> {
-        &self.node_inner.simulate_sequences
-    }
-
-    pub(crate) fn broadcast_sequences(&self) -> &RwLock<HashMap<Address, SequenceInformation>> {
-        &self.node_inner.broadcast_sequences
-    }
-
     pub(crate) fn set_broken(
-        &mut self,
+        &self,
         err: impl FnOnce(Arc<String>) -> ConnectionError,
         details: &QueryErrorDetails,
     ) {
@@ -225,14 +210,18 @@ impl Node {
         }
     }
 
-    pub(crate) fn is_healthy(&self, allowed_error_count: usize) -> NodeHealthLevel {
+    pub(crate) fn is_fallback(&self) -> bool {
+        self.node_inner.is_fallback
+    }
+
+    pub(crate) fn node_health_level(&self) -> NodeHealthLevel {
         match &*self.node_inner.last_error.read() {
-            None => NodeHealthLevel::Healthy,
-            Some(last_error) => last_error.is_healthy(allowed_error_count),
+            None => NodeHealthLevel::Unblocked { error_count: 0 },
+            Some(last_error) => last_error.node_health_level(),
         }
     }
 
-    pub(crate) fn health_report(&self, allowed_error_count: usize) -> SingleNodeHealthReport {
+    pub(crate) fn health_report(&self) -> SingleNodeHealthReport {
         let guard = self.node_inner.last_error.read();
         let last_error = guard.as_ref();
         let QueryCount {
@@ -242,9 +231,7 @@ impl Node {
         SingleNodeHealthReport {
             grpc_url: self.node_inner.grpc_url.clone(),
             is_fallback: self.node_inner.is_fallback,
-            is_healthy: last_error.as_ref().map_or(true, |last_error| {
-                last_error.is_healthy(allowed_error_count).is_healthy()
-            }),
+            node_health_level: self.node_health_level(),
             error_count: last_error.map_or(0, |last_error| last_error.error_count),
             last_error: last_error.map(|last_error| {
                 let error = match &last_error.action {
@@ -333,30 +320,5 @@ impl Node {
         &self,
     ) -> crate::osmosis::txfees::query_client::QueryClient<CosmosChannel> {
         crate::osmosis::txfees::query_client::QueryClient::new(self.node_inner.channel.clone())
-    }
-}
-
-#[derive(Debug)]
-pub(crate) enum NodeHealthLevel {
-    /// Fully healthy node, feel free to use it
-    Healthy,
-    /// Unhealthy, prefer others
-    Unhealthy,
-    /// Do not use at all, such as during rate limiting
-    Blocked,
-}
-impl NodeHealthLevel {
-    pub(crate) fn is_healthy(&self) -> bool {
-        match self {
-            NodeHealthLevel::Healthy => true,
-            NodeHealthLevel::Unhealthy | NodeHealthLevel::Blocked => false,
-        }
-    }
-
-    pub(crate) fn is_blocked(&self) -> bool {
-        match self {
-            NodeHealthLevel::Healthy | NodeHealthLevel::Unhealthy => false,
-            NodeHealthLevel::Blocked => true,
-        }
     }
 }

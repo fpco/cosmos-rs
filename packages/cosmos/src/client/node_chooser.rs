@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use rand::seq::SliceRandom;
-
 use crate::{
-    error::{Action, BuilderError, ConnectionError, NodeHealthReport, QueryErrorDetails},
+    error::{Action, BuilderError, NodeHealthLevel, NodeHealthReport, QueryErrorDetails},
     CosmosBuilder,
 };
 
@@ -13,8 +11,12 @@ use super::node::Node;
 pub(super) struct NodeChooser {
     primary: Arc<Node>,
     fallbacks: Arc<[Node]>,
-    /// How many errors in a row are allowed before we call a node unhealthy?
-    pub(crate) allowed_error_count: usize,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+struct NodeScore {
+    error_count: usize,
+    is_fallback: bool,
 }
 
 impl NodeChooser {
@@ -27,53 +29,43 @@ impl NodeChooser {
                 .map(|fallback| builder.make_node(fallback, true))
                 .collect::<Result<Vec<_>, _>>()?
                 .into(),
-            allowed_error_count: builder.get_allowed_error_count(),
         })
     }
 
-    pub(super) fn choose_node(&self) -> Result<&Node, ConnectionError> {
-        // First we try to find a node that has had no issues at all.
-        // If that fails, then we go for the allowed error count.
-        // Motivation: we previously had issues where we would retry the primary
-        // node multiple times, exhausting our retry counts, and never fall
-        // back to another node.
-        self.choose_node_with_allowed(0)
-            .or_else(|_| self.choose_node_with_allowed(self.allowed_error_count))
-    }
-
-    fn choose_node_with_allowed(
-        &self,
-        allowed_error_count: usize,
-    ) -> Result<&Node, ConnectionError> {
-        let primary_health = self.primary.is_healthy(allowed_error_count);
-        if primary_health.is_healthy() {
-            Ok(&self.primary)
-        } else {
-            let fallbacks = self
-                .fallbacks
-                .iter()
-                .filter(|node| node.is_healthy(allowed_error_count).is_healthy())
-                .collect::<Vec<_>>();
-
-            let mut rng = rand::thread_rng();
-            if let Some(node) = fallbacks.as_slice().choose(&mut rng) {
-                Ok(*node)
-            } else if primary_health.is_blocked() {
-                Err(ConnectionError::NoHealthyFound)
-            } else {
-                Ok(&self.primary)
-            }
-        }
+    /// Choose a list of nodes to try, including fallbacks.
+    ///
+    /// We return a Vec, ordered so that the client should try them in
+    /// succession.
+    ///
+    /// The priority of the nodes is given by:
+    ///
+    /// * Blocked nodes are always skipped.
+    ///
+    /// * Nodes are sorted by error count.
+    ///
+    /// * For nodes with the same error count, primary is used first.
+    pub(super) fn choose_nodes(&self) -> Vec<Node> {
+        let mut nodes = std::iter::once(&*self.primary)
+            .chain(&*self.fallbacks)
+            .filter_map(|node| match node.node_health_level() {
+                NodeHealthLevel::Unblocked { error_count } => Some((
+                    NodeScore {
+                        error_count,
+                        is_fallback: node.is_fallback(),
+                    },
+                    node.clone(),
+                )),
+                NodeHealthLevel::Blocked => None,
+            })
+            .collect::<Vec<_>>();
+        nodes.sort_by_key(|(score, _)| *score);
+        nodes.into_iter().map(|(_, node)| node).collect()
     }
 
     pub(super) fn health_report(&self) -> NodeHealthReport {
         NodeHealthReport {
-            nodes: std::iter::once(self.primary.health_report(self.allowed_error_count))
-                .chain(
-                    self.fallbacks
-                        .iter()
-                        .map(|node| node.health_report(self.allowed_error_count)),
-                )
+            nodes: std::iter::once(self.primary.health_report())
+                .chain(self.fallbacks.iter().map(|node| node.health_report()))
                 .collect(),
         }
     }
@@ -108,5 +100,41 @@ impl<'a> Iterator for AllNodes<'a> {
             Some(primary) => Some(primary),
             None => self.fallbacks.next(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn node_score_order() {
+        assert!(
+            NodeScore {
+                error_count: 0,
+                is_fallback: false
+            } < NodeScore {
+                error_count: 0,
+                is_fallback: true
+            }
+        );
+        assert!(
+            NodeScore {
+                error_count: 1,
+                is_fallback: false
+            } > NodeScore {
+                error_count: 0,
+                is_fallback: true
+            }
+        );
+        assert!(
+            NodeScore {
+                error_count: 1,
+                is_fallback: false
+            } < NodeScore {
+                error_count: 1,
+                is_fallback: true
+            }
+        );
     }
 }
