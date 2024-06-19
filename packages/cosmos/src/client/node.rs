@@ -231,7 +231,10 @@ impl Node {
         SingleNodeHealthReport {
             grpc_url: self.node_inner.grpc_url.clone(),
             is_fallback: self.node_inner.is_fallback,
-            node_health_level: self.node_health_level(),
+            node_health_level: last_error
+                .map_or(NodeHealthLevel::Unblocked { error_count: 0 }, |x| {
+                    x.node_health_level()
+                }),
             error_count: last_error.map_or(0, |last_error| last_error.error_count),
             last_error: last_error.map(|last_error| {
                 let error = match &last_error.action {
