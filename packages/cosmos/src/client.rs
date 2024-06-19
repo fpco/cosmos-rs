@@ -344,7 +344,7 @@ impl Cosmos {
         // we'll look at optimizing this further.
         let all_nodes_handle = if all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast()
         {
-            tracing::debug!("Initiating all-nodes broadcast");
+            tracing::info!("Initiating all-nodes broadcast");
             let cosmos = cosmos.clone();
             let req = req.clone();
             Some(tokio::spawn(async move {
@@ -359,7 +359,7 @@ impl Cosmos {
                     }
                     match cosmos.perform_query_inner(req.clone(), node).await {
                         Ok(tonic) => {
-                            tracing::debug!(
+                            tracing::info!(
                                 "Successfully performed an all-nodes broadcast to {}",
                                 node.grpc_url(),
                             );
@@ -371,7 +371,7 @@ impl Cosmos {
                             }
                         }
                         Err((err, _)) => {
-                            tracing::debug!("Failed doing an all-nodes broadcast: {err}")
+                            tracing::info!("Failed doing an all-nodes broadcast: {err}")
                         }
                     }
                 }
@@ -388,8 +388,14 @@ impl Cosmos {
         // We want to keep trying up to our total attempts amount.
         // We're willing to reuse nodes that we had tried previously.
         let nodes = nodes.into_iter().cycle().take(total_attempts);
+        let node_urls = nodes
+            .clone()
+            .map(|x| x.grpc_url().clone())
+            .collect::<Vec<_>>();
+        tracing::info!("Going to make {total_attempts} attempts. Nodes to use: {node_urls:?}");
 
         for (idx, node) in nodes.enumerate() {
+            tracing::info!("Attempt #{} against {}", idx + 1, node.grpc_url());
             let _permit = cosmos.pool.get_node_permit().await;
             if cosmos.pool.builder.get_log_requests() {
                 tracing::info!("{action}");
@@ -397,6 +403,7 @@ impl Cosmos {
 
             match cosmos.perform_query_inner(req.clone(), &node).await {
                 Ok(x) => {
+                    tracing::info!("Successfully ran query against {}", node.grpc_url());
                     node.log_query_result(QueryResult::Success);
                     return Ok(PerformQueryWrapper {
                         grpc_url: node.grpc_url().clone(),
@@ -404,6 +411,10 @@ impl Cosmos {
                     });
                 }
                 Err((err, can_retry)) => {
+                    tracing::info!(
+                        "Error running query against {}. can_retry: {can_retry}: {err}",
+                        node.grpc_url()
+                    );
                     node.log_query_result(if can_retry {
                         QueryResult::NetworkError {
                             err: err.clone(),
@@ -413,7 +424,7 @@ impl Cosmos {
                         QueryResult::OtherError
                     });
 
-                    tracing::debug!(
+                    tracing::info!(
                         "Error performing a query, retrying. Attempt {} of {total_attempts}. {err:?}",
                         idx + 1,
                     );
