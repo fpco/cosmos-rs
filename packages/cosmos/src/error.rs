@@ -439,6 +439,8 @@ pub enum CosmosSdkError {
     TxTimeoutHeight,
     /// Code 32
     IncorrectAccountSequence,
+    /// Codespace mempool, Code 3
+    TxInCache,
     /// Some other error code
     Other { code: u32, codespace: String },
 }
@@ -451,6 +453,7 @@ impl Display for CosmosSdkError {
             CosmosSdkError::OutOfGas => f.write_str("out of gas (11)"),
             CosmosSdkError::InsufficientFee => f.write_str("insufficient fee (13)"),
             CosmosSdkError::TxInMempool => f.write_str("tx already in mempool (19)"),
+            CosmosSdkError::TxInCache => f.write_str("tx already in cache (mempool:3)"),
             CosmosSdkError::TxTooLarge => f.write_str("tx too large (21)"),
             CosmosSdkError::InvalidChainId => f.write_str("invalid chain ID (28)"),
             CosmosSdkError::TxTimeoutHeight => f.write_str("tx timeout height (30)"),
@@ -482,11 +485,32 @@ impl CosmosSdkError {
                     codespace: codespace.to_owned(),
                 },
             }
+        } else if codespace == "mempool" && code == 3 {
+            Self::TxInCache
         } else {
             Self::Other {
                 code,
                 codespace: codespace.to_owned(),
             }
+        }
+    }
+
+    /// Do we consider a broadcast successful?
+    pub(crate) fn is_successful_broadcast(&self) -> bool {
+        match self {
+            CosmosSdkError::TxInMempool | CosmosSdkError::TxInCache => true,
+            CosmosSdkError::Unauthorized
+            | CosmosSdkError::InsufficientFunds
+            | CosmosSdkError::OutOfGas
+            | CosmosSdkError::InsufficientFee
+            | CosmosSdkError::TxTooLarge
+            | CosmosSdkError::InvalidChainId
+            | CosmosSdkError::TxTimeoutHeight
+            | CosmosSdkError::IncorrectAccountSequence
+            | CosmosSdkError::Other {
+                code: _,
+                codespace: _,
+            } => false,
         }
     }
 }
@@ -514,11 +538,6 @@ impl QueryErrorDetails {
             QueryErrorDetails::NotFound(_) => ConnectionIsFine,
             QueryErrorDetails::CosmosSdk { error_code, .. } => {
                 match *error_code {
-                    // tx already in mempool usually indicates some kind of a
-                    // node sync issue is occurring, where the node isn't seeing
-                    // new blocks already containing the transaction/sequence
-                    // number.
-                    CosmosSdkError::TxInMempool => NetworkIssue,
                     // Treat account sequence issue as a transitent issue
                     CosmosSdkError::IncorrectAccountSequence => ConnectionIsFine,
                     // Invalid chain ID, we should try a different node if possible
