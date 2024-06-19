@@ -342,14 +342,14 @@ impl Cosmos {
         // first we kick off a task to broadcast to all nodes.
         // This is redundant with our broadcasts below, perhaps in the future
         // we'll look at optimizing this further.
-        let all_nodes_success = Arc::new(parking_lot::Mutex::new(None));
-        if all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast() {
+        let all_nodes_handle = if all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast()
+        {
             tracing::debug!("Initiating all-nodes broadcast");
             let cosmos = cosmos.clone();
             let req = req.clone();
-            let all_nodes_success = all_nodes_success.clone();
-            tokio::spawn(async move {
+            Some(tokio::spawn(async move {
                 let all_nodes = cosmos.pool.all_nodes();
+                let mut success = None;
                 for node in all_nodes {
                     let _permit = cosmos.pool.get_node_permit().await;
                     match node.node_health_level() {
@@ -363,9 +363,8 @@ impl Cosmos {
                                 "Successfully performed an all-nodes broadcast to {}",
                                 node.grpc_url(),
                             );
-                            let mut guard = all_nodes_success.lock();
-                            if guard.is_none() {
-                                *guard = Some(PerformQueryWrapper {
+                            if success.is_none() {
+                                success = Some(PerformQueryWrapper {
                                     grpc_url: node.grpc_url().clone(),
                                     tonic,
                                 });
@@ -376,8 +375,11 @@ impl Cosmos {
                         }
                     }
                 }
-            });
-        }
+                success
+            }))
+        } else {
+            None
+        };
 
         let nodes = cosmos.pool.node_chooser.choose_nodes();
         let mut first_error = None;
@@ -428,8 +430,10 @@ impl Cosmos {
         }
 
         // If we did an all-nodes broadcast and one was successful, use it.
-        if let Some(res) = all_nodes_success.lock().take() {
-            return Ok(res);
+        if let Some(handle) = all_nodes_handle {
+            if let Ok(Some(res)) = handle.await {
+                return Ok(res);
+            }
         }
 
         let (err, grpc_url) = match first_error {
