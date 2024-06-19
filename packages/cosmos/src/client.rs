@@ -1712,7 +1712,7 @@ impl TxBuilder {
             // when using all-node broadcasting.
             if !(self.skip_code_check
                 || res.code == 0
-                || (res.codespace == "sdk" && res.code == 19))
+                || CosmosSdkError::from_code(res.code, &res.codespace).is_successful_broadcast())
             {
                 return Err(crate::Error::TransactionFailed {
                     code: CosmosSdkError::from_code(res.code, &res.codespace),
