@@ -32,14 +32,13 @@ pub struct CosmosBuilder {
     connection_timeout: Option<Duration>,
     idle_timeout_seconds: Option<u32>,
     query_timeout_seconds: Option<u32>,
-    query_retries: Option<u32>,
+    query_retries: Option<usize>,
     block_lag_allowed: Option<u32>,
     latest_block_age_allowed: Option<Duration>,
     fallback_timeout: Option<Duration>,
     pub(crate) chain_paused_method: ChainPausedMethod,
     pub(crate) autofix_simulate_sequence_mismatch: Option<bool>,
     dynamic_gas_retries: Option<u32>,
-    allowed_error_count: Option<usize>,
     osmosis_gas_params: Option<OsmosisGasParams>,
     osmosis_gas_price_too_old_seconds: Option<u64>,
     max_price: Option<f64>,
@@ -84,7 +83,6 @@ impl CosmosBuilder {
             chain_paused_method: ChainPausedMethod::None,
             autofix_simulate_sequence_mismatch: None,
             dynamic_gas_retries: None,
-            allowed_error_count: None,
             osmosis_gas_params: None,
             osmosis_gas_price_too_old_seconds: None,
             max_price: None,
@@ -315,12 +313,12 @@ impl CosmosBuilder {
     /// Only retries if there is a tonic-level error.
     ///
     /// Defaults to 3
-    pub fn query_retries(&self) -> u32 {
+    pub fn query_retries(&self) -> usize {
         self.query_retries.unwrap_or(3)
     }
 
     /// See [Self::query_retries]
-    pub fn set_query_retries(&mut self, query_retries: Option<u32>) {
+    pub fn set_query_retries(&mut self, query_retries: Option<usize>) {
         self.query_retries = query_retries;
     }
 
@@ -386,18 +384,6 @@ impl CosmosBuilder {
     /// See [Self::autofix_sequence_mismatch]
     pub fn set_autofix_sequence_mismatch(&mut self, autofix_sequence_mismatch: Option<bool>) {
         self.autofix_simulate_sequence_mismatch = autofix_sequence_mismatch;
-    }
-
-    /// How many network errors in a row are allowed before we consider a node unhealthy?
-    ///
-    /// Default: 3
-    pub fn get_allowed_error_count(&self) -> usize {
-        self.allowed_error_count.unwrap_or(3)
-    }
-
-    /// See [Self::get_allowed_error_count]
-    pub fn set_allowed_error_count(&mut self, allowed: Option<usize>) {
-        self.allowed_error_count = allowed;
     }
 
     /// Set parameters for Osmosis's EIP fee market gas.

@@ -699,11 +699,33 @@ pub struct NodeHealthReport {
 pub struct SingleNodeHealthReport {
     pub grpc_url: Arc<String>,
     pub is_fallback: bool,
-    pub is_healthy: bool,
+    pub node_health_level: NodeHealthLevel,
     pub last_error: Option<LastNodeError>,
     pub error_count: usize,
     pub first_request: Option<DateTime<Utc>>,
     pub total_query_count: u64,
+}
+
+/// Describes the health status of an individual node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NodeHealthLevel {
+    /// Not currently blocked, returns active error count
+    Unblocked { error_count: usize },
+    /// Do not use at all, such as during rate limiting
+    Blocked,
+}
+
+impl Display for NodeHealthLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            NodeHealthLevel::Unblocked { error_count } => match error_count {
+                0 => f.write_str("Healthy"),
+                1 => f.write_str("1 error"),
+                _ => write!(f, "{error_count} errors"),
+            },
+            NodeHealthLevel::Blocked => f.write_str("Blocked"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -726,8 +748,8 @@ impl Display for SingleNodeHealthReport {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Health report for {}. Fallback: {}. Healthy: {}. ",
-            self.grpc_url, self.is_fallback, self.is_healthy
+            "Health report for {}. Fallback: {}. Health: {}. ",
+            self.grpc_url, self.is_fallback, self.node_health_level
         )?;
         match &self.last_error {
             None => write!(f, "No errors")?,
