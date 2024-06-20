@@ -646,39 +646,10 @@ pub(crate) struct SequenceInformation {
 }
 
 impl CosmosBuilder {
-    /// Create a new [Cosmos] and perform a sanity check to make sure the connection works.
-    pub async fn build(self) -> Result<Cosmos, BuilderError> {
-        let cosmos = self.build_lazy()?;
-
-        let resp = cosmos
-            .perform_query(GetLatestBlockRequest {}, Action::SanityCheck)
-            .no_retry()
-            .run()
-            .await
-            .map_err(|source| BuilderError::SanityQueryFailed { source })?;
-
-        let actual = resp
-            .into_inner()
-            .block
-            .and_then(|block| block.header)
-            .map(|header| header.chain_id);
-
-        let expected = cosmos.get_cosmos_builder().chain_id();
-        if actual.as_deref() == Some(expected) {
-            Ok(cosmos)
-        } else {
-            Err(BuilderError::MismatchedChainIds {
-                grpc_url: cosmos.get_cosmos_builder().grpc_url().to_owned(),
-                expected: expected.to_owned(),
-                actual,
-            })
-        }
-    }
-
     /// Create a new [Cosmos] but do not perform any sanity checks.
     ///
     /// Can fail if parsing the gRPC URLs fails.
-    pub fn build_lazy(self) -> Result<Cosmos, BuilderError> {
+    pub fn build(self) -> Result<Cosmos, BuilderError> {
         let builder = Arc::new(self);
         let chain_paused_status = builder.chain_paused_method.into();
         let gas_multiplier = builder.build_gas_multiplier();
@@ -1853,36 +1824,30 @@ mod tests {
     }
 
     #[tokio::test]
-
     async fn lazy_load() {
         let mut builder = CosmosNetwork::OsmosisTestnet.builder().await.unwrap();
         builder.set_query_retries(Some(0));
         // something that clearly won't work
         builder.set_grpc_url("https://0.0.0.0:0".to_owned());
 
-        builder.clone().build().await.unwrap_err();
-        let cosmos = builder.build_lazy().unwrap();
+        let cosmos = builder.build().unwrap();
         cosmos.get_latest_block_info().await.unwrap_err();
     }
 
     #[tokio::test]
     async fn fallback() {
         let mut builder = CosmosNetwork::OsmosisTestnet.builder().await.unwrap();
-        // FIXME
-        // builder.set_allowed_error_count(Some(0));
         builder.add_grpc_fallback_url(builder.grpc_url().to_owned());
         builder.set_grpc_url("http://0.0.0.0:0");
-        let cosmos = builder.build_lazy().unwrap();
+        let cosmos = builder.build().unwrap();
         cosmos.get_latest_block_info().await.unwrap();
     }
 
     #[tokio::test]
     async fn ignore_broken_fallback() {
         let mut builder = CosmosNetwork::OsmosisTestnet.builder().await.unwrap();
-        // FIXME
-        // builder.set_allowed_error_count(Some(0));
         builder.add_grpc_fallback_url("http://0.0.0.0:0");
-        let cosmos = builder.build_lazy().unwrap();
+        let cosmos = builder.build().unwrap();
         cosmos.get_latest_block_info().await.unwrap();
     }
 
