@@ -49,6 +49,7 @@ pub struct CosmosBuilder {
     http2_keep_alive_interval: Option<Duration>,
     keep_alive_while_idle: Option<bool>,
     simulate_with_gas_coin: bool,
+    delay_before_fallback: Option<tokio::time::Duration>,
 }
 
 impl CosmosBuilder {
@@ -94,6 +95,7 @@ impl CosmosBuilder {
             http2_keep_alive_interval: None,
             keep_alive_while_idle: None,
             simulate_with_gas_coin,
+            delay_before_fallback: None,
         }
     }
 
@@ -502,6 +504,19 @@ impl CosmosBuilder {
     /// See [Self::get_simulate_with_gas_coin]
     pub fn set_simulate_with_gas_coin(&mut self, value: bool) {
         self.simulate_with_gas_coin = value;
+    }
+
+    /// How long to delay between each fallback node attempt?
+    ///
+    /// Default: 500ms
+    pub fn get_delay_before_fallback(&self) -> tokio::time::Duration {
+        self.delay_before_fallback
+            .unwrap_or(tokio::time::Duration::from_millis(500))
+    }
+
+    /// See [Self::get_delay_before_fallback]
+    pub fn set_delay_before_fallback(&mut self, delay: tokio::time::Duration) {
+        self.delay_before_fallback = Some(delay);
     }
 }
 
