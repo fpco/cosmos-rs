@@ -411,7 +411,7 @@ impl Cosmos {
                             break;
                         }
                         Err((err, can_retry)) => {
-                            tracing::debug!("Error performing a query, retrying. Attempt {attempt} of {total_attempts}. {err:?}");
+                            tracing::debug!("Error performing a query. Attempt {attempt} of {total_attempts}. can_retry={can_retry}. should_retry={should_retry}. {err:?}");
                             node.log_query_result(if can_retry {
                                 QueryResult::NetworkError {
                                     err: err.clone(),
