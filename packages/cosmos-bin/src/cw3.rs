@@ -97,7 +97,7 @@ pub(crate) async fn go(cosmos: Cosmos, Opt { sub }: Opt) -> Result<()> {
         Subcommand::List { inner } => list(cosmos, inner).await,
         Subcommand::Vote { inner } => vote(cosmos, inner).await,
         Subcommand::Execute { inner } => execute(cosmos, inner).await,
-        Subcommand::WasmExecuteMessage { inner } => wasm_execute_message(inner),
+        Subcommand::WasmExecuteMessage { inner } => wasm_execute_message(&cosmos, inner).await,
         Subcommand::MigrateContractMessage { inner } => migrate_contract_message(inner),
         Subcommand::SendCoinsMessage { inner } => send_coins_message(&cosmos, inner).await,
     }
@@ -411,10 +411,18 @@ struct WasmExecuteMessageOpt {
     /// Message to submit
     #[clap(long)]
     message: String,
+    /// Should we simulate? If so, what address should we simulate from?
+    #[clap(long)]
+    simulate: Option<Address>,
 }
 
-fn wasm_execute_message(
-    WasmExecuteMessageOpt { contract, message }: WasmExecuteMessageOpt,
+async fn wasm_execute_message(
+    cosmos: &Cosmos,
+    WasmExecuteMessageOpt {
+        contract,
+        message,
+        simulate,
+    }: WasmExecuteMessageOpt,
 ) -> Result<()> {
     let msg = serde_json::from_str::<serde_json::Value>(&message)?;
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
@@ -423,6 +431,13 @@ fn wasm_execute_message(
         funds: vec![],
     });
     println!("{}", serde_json::to_string(&msg)?);
+
+    if let Some(sender) = simulate {
+        let mut tx = TxBuilder::default();
+        tx.add_execute_message_bytes(contract, sender, vec![], message)?;
+        let res = tx.simulate(cosmos, &[sender.get_address()]).await?;
+        println!("Simulation successful. Gas used: {}", res.gas_used);
+    }
     Ok(())
 }
 
