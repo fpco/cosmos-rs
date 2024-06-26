@@ -365,12 +365,13 @@ impl Cosmos {
         let (tx_error, mut rx_error) = tokio::sync::mpsc::channel(1);
 
         // Grab some config values.
-        let all_nodes = all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast();
+        let all_nodes_broadcast =
+            all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast();
         let delay = cosmos.get_cosmos_builder().get_delay_before_fallback();
         let total_attempts = cosmos.pool.builder.query_retries();
 
         // Get the set of nodes we should run against.
-        let nodes = if all_nodes {
+        let nodes = if all_nodes_broadcast {
             cosmos
                 .pool
                 .all_nodes()
@@ -433,7 +434,7 @@ impl Cosmos {
             // If we're not doing an all-nodes broadcast, then check we wait-and-check.
             // The waiting is handled by the sleep call. If a successful response
             // comes in while timeout-ing, then we'll get that result and return it.
-            if !all_nodes {
+            if !all_nodes_broadcast {
                 tokio::select! {
                     // Timeout occurred, keep going
                     _ = tokio::time::sleep(delay) => (),
@@ -477,7 +478,7 @@ impl Cosmos {
 
         // Now that we have our results, stop running the other
         // tasks, unless we're doing an all-nodes broadcast.
-        if !all_nodes {
+        if !all_nodes_broadcast {
             set.abort_all();
         }
 
