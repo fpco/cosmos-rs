@@ -1,9 +1,6 @@
 use std::str::FromStr;
 
 use crate::Coin;
-use anyhow::Context;
-use once_cell::sync::Lazy;
-use regex::Regex;
 
 /// Allows for parsing of a coin, it provides conversions to different coin types.
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -30,37 +27,39 @@ impl From<ParsedCoin> for cosmwasm_std::Coin {
     }
 }
 
-// Regex to capture the amount and denom of a coin.
-// ^ - start of string
-// (\d+) - first capture group, the amount: one or more digits
-// ([a-zA-z0-9/]+) - second capture group, the denom: any character in the range a-z, A-Z, 0-9, or /
-// $ - end of string
-static COIN_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\d+)([a-zA-z0-9/]+)$").unwrap());
-
 impl FromStr for ParsedCoin {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         (|| {
-            let captures = COIN_REGEX
-                .captures(s)
-                .with_context(|| format!("Could not parse coin value: {}", s))?;
+            if s.is_empty() {
+                anyhow::bail!("Input is empty");
+            }
 
-            // the full capture is at 0, the first capture group is at 1, the second at 2, etc.
-            let amount = captures
-                .get(1)
-                .with_context(|| format!("Could not parse amount: {}", s))?
-                .as_str();
+            let denom_first_index = s
+                .char_indices()
+                .find(|(_, char)| !char.is_ascii_digit())
+                .map(|(index, _)| index);
 
-            let denom = captures
-                .get(2)
-                .with_context(|| format!("Could not parse denom: {}", s))?
-                .as_str();
+            match denom_first_index {
+                None => anyhow::bail!("Denom is missing"),
+                Some(0) => anyhow::bail!("Amount is missing"),
+                Some(denom_first_index) => {
+                    let amount = &s[..denom_first_index];
+                    let denom = &s[denom_first_index..];
 
-            Ok(ParsedCoin {
-                denom: denom.to_owned(),
-                amount: amount.parse()?,
-            })
+                    for char in denom.chars() {
+                        if !char.is_ascii_alphanumeric() && char != '/' {
+                            anyhow::bail!("Invalid character in denom");
+                        }
+                    }
+
+                    Ok(ParsedCoin {
+                        denom: denom.to_owned(),
+                        amount: amount.parse()?,
+                    })
+                }
+            }
         })()
         .map_err(|err: anyhow::Error| {
             anyhow::anyhow!("Could not parse coin value {s:?}, error: {err:?}")
