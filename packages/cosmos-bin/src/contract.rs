@@ -5,10 +5,10 @@ use cosmos::{
     proto::cosmwasm::wasm::v1::{
         ContractCodeHistoryEntry, ContractInfo, MsgExecuteContract, QueryContractHistoryResponse,
     },
-    Address, ContractAdmin, Cosmos, HasAddress, HasAddressHrp, RawAddress, TxBuilder,
+    Address, ContractAdmin, Cosmos, HasAddress, HasAddressHrp, ParsedCoin, RawAddress, TxBuilder,
 };
 
-use crate::{cli::TxOpt, parsed_coin::ParsedCoin};
+use crate::cli::TxOpt;
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {

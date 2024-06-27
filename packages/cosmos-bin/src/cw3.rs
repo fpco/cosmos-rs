@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, ContractAdmin, Cosmos, HasAddress,
-    HasAddressHrp, TxBuilder,
+    HasAddressHrp, ParsedCoin, TxBuilder,
 };
 use cosmwasm_std::{to_json_binary, CosmosMsg, Decimal, Empty, WasmMsg};
 use cw3::{ProposalListResponse, ProposalResponse};
 use cw4::Member;
 use cw_utils::Threshold;
 
-use crate::{cli::TxOpt, my_duration::MyDuration, parsed_coin::ParsedCoin};
+use crate::{cli::TxOpt, my_duration::MyDuration};
 
 #[derive(Clone, Copy, Debug)]
 enum ContractType {

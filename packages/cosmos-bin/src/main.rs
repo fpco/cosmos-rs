@@ -6,7 +6,6 @@ mod contract;
 mod cw3;
 mod my_duration;
 mod nft;
-mod parsed_coin;
 mod tokenfactory;
 mod wallet;
 

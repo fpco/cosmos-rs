@@ -1,12 +1,13 @@
 use std::str::FromStr;
 
+use crate::Coin;
 use anyhow::Context;
-use cosmos::Coin;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+/// Allows for parsing of a coin, it provides conversions to different coin types.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub(super) struct ParsedCoin {
+pub struct ParsedCoin {
     denom: String,
     amount: u128,
 }
