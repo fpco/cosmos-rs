@@ -561,7 +561,6 @@ dependencies = [
  "prost-types",
  "quickcheck",
  "rand",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
