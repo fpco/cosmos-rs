@@ -51,6 +51,24 @@ pub enum WalletError {
     InvalidPhrase { source: <Mnemonic as FromStr>::Err },
 }
 
+/// Error while parsing a [crate::ParsedCoin].
+#[derive(thiserror::Error, Debug, Clone)]
+pub enum ParsedCoinError {
+    #[error("Input is empty")]
+    EmptyInput,
+    #[error("No amount found in {input:?}")]
+    NoAmountFound { input: String },
+    #[error("No denom found in {input:?}")]
+    NoDenomFound { input: String },
+    #[error("Invalid denom: {input:?}")]
+    InvalidDenom { input: String },
+    #[error("Invalid amount: {input:?}: {source:?}")]
+    InvalidAmount {
+        input: String,
+        source: std::num::ParseIntError,
+    },
+}
+
 /// Errors that can occur while building a connection.
 #[derive(thiserror::Error, Debug)]
 pub enum BuilderError {

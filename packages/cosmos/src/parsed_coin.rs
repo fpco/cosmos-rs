@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::Coin;
+use crate::{error::ParsedCoinError, Coin};
 
 /// Allows for parsing of a coin, it provides conversions to different coin types.
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -28,41 +28,47 @@ impl From<ParsedCoin> for cosmwasm_std::Coin {
 }
 
 impl FromStr for ParsedCoin {
-    type Err = anyhow::Error;
+    type Err = ParsedCoinError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        (|| {
-            if s.is_empty() {
-                anyhow::bail!("Input is empty");
-            }
+        if s.is_empty() {
+            return Err(ParsedCoinError::EmptyInput);
+        }
 
-            let denom_first_index = s
-                .char_indices()
-                .find(|(_, char)| !char.is_ascii_digit())
-                .map(|(index, _)| index);
+        let denom_first_index = s
+            .char_indices()
+            .find(|(_, char)| !char.is_ascii_digit())
+            .map(|(index, _)| index);
 
-            match denom_first_index {
-                None => anyhow::bail!("Denom is missing"),
-                Some(0) => anyhow::bail!("Amount is missing"),
-                Some(denom_first_index) => {
-                    let (amount, denom) = s.split_at(denom_first_index);
+        match denom_first_index {
+            None => Err(ParsedCoinError::NoDenomFound {
+                input: s.to_owned(),
+            }),
+            Some(0) => Err(ParsedCoinError::NoAmountFound {
+                input: s.to_owned(),
+            }),
+            Some(denom_first_index) => {
+                let (amount, denom) = s.split_at(denom_first_index);
 
-                    for char in denom.chars() {
-                        if !char.is_ascii_alphanumeric() && char != '/' {
-                            anyhow::bail!("Invalid character in denom");
-                        }
+                for char in denom.chars() {
+                    if !char.is_ascii_alphanumeric() && char != '/' {
+                        return Err(ParsedCoinError::InvalidDenom {
+                            input: s.to_owned(),
+                        });
                     }
-
-                    Ok(ParsedCoin {
-                        denom: denom.to_owned(),
-                        amount: amount.parse()?,
-                    })
                 }
+
+                Ok(ParsedCoin {
+                    denom: denom.to_owned(),
+                    amount: amount
+                        .parse()
+                        .map_err(|source| ParsedCoinError::InvalidAmount {
+                            input: s.to_owned(),
+                            source,
+                        })?,
+                })
             }
-        })()
-        .map_err(|err: anyhow::Error| {
-            anyhow::anyhow!("Could not parse coin value {s:?}, error: {err:?}")
-        })
+        }
     }
 }
 
@@ -72,7 +78,7 @@ mod tests {
 
     use super::*;
 
-    fn parse_coin(s: &str) -> anyhow::Result<ParsedCoin> {
+    fn parse_coin(s: &str) -> Result<ParsedCoin, ParsedCoinError> {
         s.parse()
     }
 
