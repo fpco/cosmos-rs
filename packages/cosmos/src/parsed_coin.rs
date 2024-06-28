@@ -45,8 +45,7 @@ impl FromStr for ParsedCoin {
                 None => anyhow::bail!("Denom is missing"),
                 Some(0) => anyhow::bail!("Amount is missing"),
                 Some(denom_first_index) => {
-                    let amount = &s[..denom_first_index];
-                    let denom = &s[denom_first_index..];
+                    let (amount, denom) = s.split_at(denom_first_index);
 
                     for char in denom.chars() {
                         if !char.is_ascii_alphanumeric() && char != '/' {
