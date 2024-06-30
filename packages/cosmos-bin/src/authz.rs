@@ -9,10 +9,10 @@ use chrono::{DateTime, Utc};
 use cosmos::{
     messages::{MsgExecHelper, MsgGrantHelper},
     proto::cosmwasm::wasm::v1::MsgExecuteContract,
-    Address, Cosmos, HasAddress, HasAddressHrp, TxBuilder, TxMessage,
+    Address, Cosmos, HasAddress, HasAddressHrp, ParsedCoin, TxBuilder, TxMessage,
 };
 
-use crate::{cli::TxOpt, my_duration::MyDuration, parsed_coin::ParsedCoin};
+use crate::{cli::TxOpt, my_duration::MyDuration};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {

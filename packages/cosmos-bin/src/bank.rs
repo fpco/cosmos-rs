@@ -1,10 +1,10 @@
 use anyhow::Result;
 use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos, HasAddress, HasAddressHrp,
-    TxBuilder,
+    ParsedCoin, TxBuilder,
 };
 
-use crate::{cli::TxOpt, parsed_coin::ParsedCoin};
+use crate::cli::TxOpt;
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
