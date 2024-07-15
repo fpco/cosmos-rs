@@ -106,33 +106,82 @@ pub enum BuilderError {
 /// Parse errors while interacting with chain data.
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ChainParseError {
-    #[error("Could not parse timestamp {timestamp:?} from transaction {txhash}: {source:?}")]
     InvalidTimestamp {
         timestamp: String,
         txhash: String,
         source: <DateTime<Utc> as FromStr>::Err,
     },
-    #[error(
-        "Invalid instantiate contract address {address:?} from transaction {txhash}: {source}"
-    )]
     InvalidInstantiatedContract {
         address: String,
         txhash: String,
         source: AddressError,
     },
-    #[error("Invalid code ID {code_id:?} from transaction {txhash}: {source:?}")]
     InvalidCodeId {
         code_id: String,
         txhash: String,
         source: std::num::ParseIntError,
     },
-    #[error("No code ID found when expecting a store code response in transaction {txhash}")]
-    NoCodeIdFound { txhash: String },
-    #[error("No instantiated contract found in transaction {txhash}")]
-    NoInstantiatedContractFound { txhash: String },
+    NoCodeIdFound {
+        txhash: String,
+    },
+    NoInstantiatedContractFound {
+        txhash: String,
+    },
+    TxFees {
+        err: String,
+    },
+}
 
-    #[error("TxFees {err}")]
-    TxFees { err: String },
+impl Display for ChainParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_helper(f, false)
+    }
+}
+
+impl ChainParseError {
+    fn fmt_helper(&self, f: &mut std::fmt::Formatter, _pretty: bool) -> std::fmt::Result {
+        match self {
+            ChainParseError::InvalidTimestamp {
+                timestamp,
+                txhash,
+                source,
+            } => {
+                write!(
+                    f,
+                    "Could not parse timestamp {timestamp:?} from transaction {txhash}: {source:?}"
+                )
+            }
+            ChainParseError::InvalidInstantiatedContract {
+                address,
+                txhash,
+                source,
+            } => {
+                write!(f, "Invalid instantiate contract address {address:?} from transaction {txhash}: {source}")
+            }
+            ChainParseError::InvalidCodeId {
+                code_id,
+                txhash,
+                source,
+            } => {
+                write!(
+                    f,
+                    "Invalid code ID {code_id:?} from transaction {txhash}: {source:?}"
+                )
+            }
+            ChainParseError::NoCodeIdFound { txhash } => {
+                write!(
+                    f,
+                    "No code ID found when expecting a store code response in transaction {txhash}"
+                )
+            }
+            ChainParseError::NoInstantiatedContractFound { txhash } => {
+                write!(f, "No instantiated contract found in transaction {txhash}")
+            }
+            ChainParseError::TxFees { err } => {
+                write!(f, "TxFees {err}")
+            }
+        }
+    }
 }
 
 /// An error that occurs while connecting to a Cosmos gRPC endpoint.
@@ -140,19 +189,68 @@ pub enum ChainParseError {
 /// This could be the initial connection or sending a new query.
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ConnectionError {
-    #[error("Sanity check on connection to {grpc_url} failed with gRPC status {source}")]
     SanityCheckFailed {
         grpc_url: Arc<String>,
         source: tonic::Status,
     },
-    #[error("Network error occured while performing query to {grpc_url}")]
-    QueryFailed { grpc_url: Arc<String> },
-    #[error("Timeout hit when querying gRPC endpoint {grpc_url}")]
-    TimeoutQuery { grpc_url: Arc<String> },
-    #[error("Timeout hit when connecting to gRPC endpoint {grpc_url}")]
-    TimeoutConnecting { grpc_url: Arc<String> },
-    #[error("No healthy nodes found")]
+    QueryFailed {
+        grpc_url: Arc<String>,
+    },
+    TimeoutQuery {
+        grpc_url: Arc<String>,
+    },
+    TimeoutConnecting {
+        grpc_url: Arc<String>,
+    },
     NoHealthyFound,
+}
+
+impl Display for ConnectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_helper(f, false)
+    }
+}
+
+impl ConnectionError {
+    fn fmt_helper(&self, f: &mut std::fmt::Formatter, pretty: bool) -> std::fmt::Result {
+        match self {
+            ConnectionError::SanityCheckFailed { grpc_url, source } => {
+                if pretty {
+                    write!(f, "Sanity check failed: {source}")
+                } else {
+                    write!(
+                        f,
+                        "Sanity check on connection to {grpc_url} failed with gRPC status {source}"
+                    )
+                }
+            }
+            ConnectionError::QueryFailed { grpc_url } => {
+                if pretty {
+                    f.write_str("Network error occurred while performing query")
+                } else {
+                    write!(
+                        f,
+                        "Network error occured while performing query to {grpc_url}"
+                    )
+                }
+            }
+            ConnectionError::TimeoutQuery { grpc_url } => {
+                if pretty {
+                    f.write_str("Timeout hit when querying blockchain node")
+                } else {
+                    write!(f, "Timeout hit when querying gRPC endpoint {grpc_url}")
+                }
+            }
+            ConnectionError::TimeoutConnecting { grpc_url } => {
+                if pretty {
+                    f.write_str("Timeout hit when connecting to blockchain node")
+                } else {
+                    write!(f, "Timeout hit when connecting to gRPC endpoint {grpc_url}")
+                }
+            }
+            ConnectionError::NoHealthyFound => f.write_str("No healthy nodes found"),
+        }
+    }
 }
 
 /// Error while parsing a [crate::ContractAdmin].
@@ -166,9 +264,6 @@ pub struct ContractAdminParseError {
 
 /// Errors that occur while querying the chain.
 #[derive(thiserror::Error, Debug, Clone)]
-#[error(
-    "On connection to {grpc_url}, while performing:\n{action}\n{query}\nHeight set to: {height:?}\n{node_health}"
-)]
 pub struct QueryError {
     pub action: Action,
     pub builder: Arc<CosmosBuilder>,
@@ -178,6 +273,32 @@ pub struct QueryError {
     pub node_health: NodeHealthReport,
 }
 
+impl QueryError {
+    fn fmt_helper(&self, f: &mut std::fmt::Formatter, pretty: bool) -> std::fmt::Result {
+        let QueryError {
+            action,
+            builder: _,
+            height,
+            query,
+            grpc_url,
+            node_health,
+        } = self;
+        if pretty {
+            query.fmt_helper(f, true)?;
+            f.write_str(" during ")?;
+            action.fmt_helper(f, true)
+        } else {
+            write!(f, "On connection to {grpc_url}, while performing:\n{action}\n{query}\nHeight set to: {height:?}\n{node_health}")
+        }
+    }
+}
+
+impl Display for QueryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_helper(f, false)
+    }
+}
+
 /// General errors while interacting with the chain
 ///
 /// This error type is used by the majority of the codebase. The idea is that
@@ -185,37 +306,31 @@ pub struct QueryError {
 /// represent errors during normal interaction.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Unable to serialize value to JSON: {0}")]
     JsonSerialize(#[from] serde_json::Error),
-    #[error(
-        "Unable to deserialize value from JSON while performing: {action}. Parse error: {source}"
-    )]
     JsonDeserialize {
         source: serde_json::Error,
         action: Box<Action>,
     },
-    #[error(transparent)]
     Query(#[from] QueryError),
-    #[error("Error parsing data returned from chain: {source}. While performing: {action}")]
     ChainParse {
         source: Box<crate::error::ChainParseError>,
         action: Box<Action>,
     },
-    #[error("Invalid response from chain: {message}. While performing: {action}")]
     InvalidChainResponse {
         message: String,
         action: Box<Action>,
     },
-    #[error("Timed out waiting for transaction {txhash}")]
-    WaitForTransactionTimedOut { txhash: String },
-    #[error("Timed out waiting for transaction {txhash} during {action}")]
-    WaitForTransactionTimedOutWhile { txhash: String, action: Box<Action> },
-    #[error("Unable to load WASM code from {}: {source}", path.display())]
+    WaitForTransactionTimedOut {
+        txhash: String,
+    },
+    WaitForTransactionTimedOutWhile {
+        txhash: String,
+        action: Box<Action>,
+    },
     LoadingWasmFromFile {
         path: PathBuf,
         source: std::io::Error,
     },
-    #[error("Transaction {txhash} failed (on {grpc_url}) during {stage} with {code} and log: {raw_log}. Action: {action}.")]
     TransactionFailed {
         code: CosmosSdkError,
         txhash: String,
@@ -224,13 +339,80 @@ pub enum Error {
         grpc_url: Arc<String>,
         stage: TransactionStage,
     },
-    #[error(transparent)]
     Connection(#[from] ConnectionError),
-    #[error("Error during wasm Gzip compression: {source}")]
-    WasmGzipFailed { source: std::io::Error },
+    WasmGzipFailed {
+        source: std::io::Error,
+    },
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_helper(f, false)
+    }
 }
 
 impl Error {
+    fn fmt_helper(&self, f: &mut std::fmt::Formatter, pretty: bool) -> std::fmt::Result {
+        match self {
+            Error::JsonSerialize(e) => write!(f, "Unable to serialize value to JSON: {e}"),
+            Error::JsonDeserialize { source, action } => {
+                write!(
+                    f,
+                    "Unable to deserialize value from JSON while performing: "
+                )?;
+                action.fmt_helper(f, pretty)?;
+                write!(f, ". Parse error: {source}")
+            }
+            Error::Query(e) => e.fmt_helper(f, pretty),
+            Error::ChainParse { source, action } => {
+                write!(f, "Error parsing data returned from chain: ")?;
+                source.fmt_helper(f, pretty)?;
+                write!(f, ". While performing: ")?;
+                action.fmt_helper(f, pretty)
+            }
+            Error::InvalidChainResponse { message, action } => {
+                write!(
+                    f,
+                    "Invalid response from chain: {message}. While performing: "
+                )?;
+                action.fmt_helper(f, pretty)
+            }
+            Error::WaitForTransactionTimedOut { txhash } => {
+                write!(f, "Timed out waiting for transaction {txhash}")
+            }
+            Error::WaitForTransactionTimedOutWhile { txhash, action } => {
+                write!(f, "Timed out waiting for transaction {txhash} during ")?;
+                action.fmt_helper(f, pretty)
+            }
+            Error::LoadingWasmFromFile { path, source } => {
+                write!(
+                    f,
+                    "Unable to load WASM code from {}: {source}",
+                    path.display()
+                )
+            }
+            Error::TransactionFailed {
+                code,
+                txhash,
+                raw_log,
+                action,
+                grpc_url,
+                stage,
+            } => {
+                if pretty {
+                    write!(f, "Transaction {txhash} failed during {stage} with {code} and log: {raw_log} during ")?;
+                    action.fmt_helper(f, true)
+                } else {
+                    write!(f, "Transaction {txhash} failed (on {grpc_url}) during {stage} with {code} and log: {raw_log}. Action: {action}.")
+                }
+            }
+            Error::Connection(e) => e.fmt_helper(f, pretty),
+            Error::WasmGzipFailed { source } => {
+                write!(f, "Error during wasm Gzip compression: {source}")
+            }
+        }
+    }
+
     pub(crate) fn get_sequence_mismatch_status(&self) -> Option<tonic::Status> {
         match self {
             Error::Query(QueryError {
@@ -309,6 +491,12 @@ pub enum Action {
 
 impl Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_helper(f, false)
+    }
+}
+
+impl Action {
+    fn fmt_helper(&self, f: &mut std::fmt::Formatter, pretty: bool) -> std::fmt::Result {
         match self {
             Action::GetBaseAccount(address) => write!(f, "get base account {address}"),
             Action::QueryAllBalances(address) => write!(f, "query all balances for {address}"),
@@ -323,11 +511,17 @@ impl Display for Action {
                 txbuilder,
                 gas_wanted,
                 fee,
-            } => write!(
-                f,
-                "broadcasting transaction with {gas_wanted} gas and {}{} fee: {txbuilder}",
-                fee.amount, fee.denom
-            ),
+            } => {
+                if pretty {
+                    write!(f, "broadcasting transaction")
+                } else {
+                    write!(
+                        f,
+                        "broadcasting transaction with {gas_wanted} gas and {}{} fee: {txbuilder}",
+                        fee.amount, fee.denom
+                    )
+                }
+            }
             Action::RawQuery { contract, key } => {
                 write!(f, "raw query contract {contract} with key: {key}")
             }
@@ -341,18 +535,36 @@ impl Display for Action {
             Action::OsmosisEpochsInfo => f.write_str("get Osmosis epochs info"),
             Action::OsmosisTxFeesInfo => f.write_str("get Osmosis txfees info"),
             Action::StoreCode { txbuilder, txhash } => {
-                write!(f, "store code in {txhash}: {txbuilder}")
+                if pretty {
+                    write!(f, "store code in {txhash}")
+                } else {
+                    write!(f, "store code in {txhash}: {txbuilder}")
+                }
             }
             Action::InstantiateContract { txbuilder, txhash } => {
-                write!(f, "instantiate contract in {txhash}: {txbuilder}")
+                if pretty {
+                    write!(f, "instantiate contract in {txhash}")
+                } else {
+                    write!(f, "instantiate contract in {txhash}: {txbuilder}")
+                }
             }
-            Action::TokenFactory { txbuilder, txhash } => write!(
-                f,
-                "perform token factory operation in {txhash}: {txbuilder}"
-            ),
+            Action::TokenFactory { txbuilder, txhash } => {
+                if pretty {
+                    write!(f, "perform token factory operation in {txhash}")
+                } else {
+                    write!(
+                        f,
+                        "perform token factory operation in {txhash}: {txbuilder}"
+                    )
+                }
+            }
             Action::BroadcastRaw => f.write_str("broadcasting a raw transaction"),
             Action::WaitForBroadcast { txbuilder, txhash } => {
-                write!(f, "waiting for transaction {txhash} to land: {txbuilder}")
+                if pretty {
+                    write!(f, "waiting for transaction {txhash}")
+                } else {
+                    write!(f, "waiting for transaction {txhash} to land: {txbuilder}")
+                }
             }
         }
     }
@@ -383,60 +595,137 @@ impl Display for StringOrBytes {
 /// additional context.
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum QueryErrorDetails {
-    #[error("Unknown gRPC status returned: {0:?}")]
     Unknown(tonic::Status),
-    #[error("Query timed out after: {0:?}")]
     QueryTimeout(Duration),
-    #[error(transparent)]
     ConnectionError(ConnectionError),
-    #[error("Not found returned from chain: {0}")]
     NotFound(String),
-    #[error("Cosmos SDK error code {error_code} returned: {source:?}")]
     CosmosSdk {
         error_code: CosmosSdkError,
         source: tonic::Status,
     },
-    #[error("Error parsing message into expected type: {0:?}")]
     JsonParseError(tonic::Status),
-    #[error("{0:?}")]
     FailedToExecute(tonic::Status),
-    #[error(
-        "Requested height not available, lowest height reported: {lowest_height:?}. {source:?}"
-    )]
     HeightNotAvailable {
         lowest_height: Option<i64>,
         source: tonic::Status,
     },
-    #[error("Error querying server, received HTTP status code {status}. {source:?}")]
     Unavailable {
         source: tonic::Status,
         status: http::status::StatusCode,
     },
-    #[error("Server does not implement expected services, it may not be a Cosmos gRPC endpoint. {source}")]
-    Unimplemented { source: tonic::Status },
-    #[error("Transport error with gRPC endpoint. {source}")]
-    TransportError { source: tonic::Status },
-    #[error("Block lag detected. Previously saw {old_height}, but just received {new_height}. Allowed lag is {block_lag_allowed}.")]
+    Unimplemented {
+        source: tonic::Status,
+    },
+    TransportError {
+        source: tonic::Status,
+    },
     BlocksLagDetected {
         old_height: i64,
         new_height: i64,
         block_lag_allowed: u32,
     },
-    #[error("No new block time found in {}s ({}s allowed). Old height: {old_height}. New height: {new_height}.", age.as_secs(), age_allowed.as_secs())]
     NoNewBlockFound {
         age: Duration,
         age_allowed: Duration,
         old_height: i64,
         new_height: i64,
     },
-    #[error("Account sequence mismatch: {0}")]
     AccountSequenceMismatch(tonic::Status),
-    #[error("You appear to be rate limited by the gRPC server: {source:?}")]
-    RateLimited { source: tonic::Status },
-    #[error("The gRPC server is returning a 'forbidden' response: {source:?}")]
-    Forbidden { source: tonic::Status },
-    #[error("Server returned response that does not look like valid gRPC: {source:?}")]
-    NotGrpc { source: tonic::Status },
+    RateLimited {
+        source: tonic::Status,
+    },
+    Forbidden {
+        source: tonic::Status,
+    },
+    NotGrpc {
+        source: tonic::Status,
+    },
+}
+
+impl Display for QueryErrorDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.fmt_helper(f, false)
+    }
+}
+
+impl QueryErrorDetails {
+    fn fmt_helper(&self, f: &mut std::fmt::Formatter, pretty: bool) -> std::fmt::Result {
+        match self {
+            QueryErrorDetails::Unknown(e) => {
+                write!(f, "Unknown gRPC status returned: {e:?}")
+            }
+            QueryErrorDetails::QueryTimeout(e) => {
+                write!(f, "Query timed out after: {e:?}")
+            }
+            QueryErrorDetails::ConnectionError(e) => e.fmt_helper(f, pretty),
+            QueryErrorDetails::NotFound(e) => {
+                write!(f, "Not found returned from chain: {e}")
+            }
+            QueryErrorDetails::CosmosSdk { error_code, source } => {
+                write!(f, "Cosmos SDK error code {error_code} returned: {source:?}")
+            }
+            QueryErrorDetails::JsonParseError(e) => {
+                write!(f, "Error parsing message into expected type: {e:?}")
+            }
+            QueryErrorDetails::FailedToExecute(e) => {
+                write!(f, "{e:?}")
+            }
+            QueryErrorDetails::HeightNotAvailable {
+                lowest_height,
+                source,
+            } => {
+                write!(f, "Requested height not available, lowest height reported: {lowest_height:?}. {source:?}")
+            }
+            QueryErrorDetails::Unavailable { source, status } => {
+                write!(
+                    f,
+                    "Error querying server, received HTTP status code {status}. {source:?}"
+                )
+            }
+            QueryErrorDetails::Unimplemented { source } => {
+                write!(f, "Server does not implement expected services, it may not be a Cosmos gRPC endpoint. {source}")
+            }
+            QueryErrorDetails::TransportError { source } => {
+                write!(f, "Transport error with gRPC endpoint. {source}")
+            }
+            QueryErrorDetails::BlocksLagDetected {
+                old_height,
+                new_height,
+                block_lag_allowed,
+            } => {
+                write!(f, "Block lag detected. Previously saw {old_height}, but just received {new_height}. Allowed lag is {block_lag_allowed}.")
+            }
+            QueryErrorDetails::NoNewBlockFound {
+                age,
+                age_allowed,
+                old_height,
+                new_height,
+            } => {
+                write!(f, "No new block time found in {}s ({}s allowed). Old height: {old_height}. New height: {new_height}.", age.as_secs(), age_allowed.as_secs())
+            }
+            QueryErrorDetails::AccountSequenceMismatch(e) => {
+                write!(f, "Account sequence mismatch: {e}")
+            }
+            QueryErrorDetails::RateLimited { source } => {
+                write!(
+                    f,
+                    "You appear to be rate limited by the gRPC server: {source:?}"
+                )
+            }
+            QueryErrorDetails::Forbidden { source } => {
+                write!(
+                    f,
+                    "The gRPC server is returning a 'forbidden' response: {source:?}"
+                )
+            }
+            QueryErrorDetails::NotGrpc { source } => {
+                write!(
+                    f,
+                    "Server returned response that does not look like valid gRPC: {source:?}"
+                )
+            }
+        }
+    }
 }
 
 /// Different known Cosmos SDK error codes
@@ -852,4 +1141,25 @@ pub enum FirstBlockAfterError {
         latest_height: i64,
         latest_timestamp: DateTime<Utc>,
     },
+}
+
+impl Error {
+    /// Wrap up in a [PrettyError].
+    pub fn pretty(self) -> PrettyError {
+        PrettyError { source: self }
+    }
+}
+
+/// Provide a user-friendly version of the error messages.
+///
+/// Normal display of errors messages is intended for server-side debugging. This contains more information than we would normally want for user-facing messages. This method provides an alternative.
+#[derive(Debug, thiserror::Error)]
+pub struct PrettyError {
+    pub source: Error,
+}
+
+impl Display for PrettyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.source.fmt_helper(f, true)
+    }
 }
