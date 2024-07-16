@@ -27,6 +27,24 @@ impl From<ParsedCoin> for cosmwasm_std::Coin {
     }
 }
 
+impl From<&ParsedCoin> for Coin {
+    fn from(ParsedCoin { denom, amount }: &ParsedCoin) -> Self {
+        Coin {
+            denom: denom.to_owned(),
+            amount: amount.to_string(),
+        }
+    }
+}
+
+impl From<&ParsedCoin> for cosmwasm_std::Coin {
+    fn from(ParsedCoin { denom, amount }: &ParsedCoin) -> Self {
+        Self {
+            denom: denom.to_owned(),
+            amount: (*amount).into(),
+        }
+    }
+}
+
 impl FromStr for ParsedCoin {
     type Err = ParsedCoinError;
 

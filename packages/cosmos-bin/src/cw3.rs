@@ -416,6 +416,9 @@ struct WasmExecuteMessageOpt {
     /// Should we simulate? If so, what address should we simulate from?
     #[clap(long)]
     simulate: Option<Address>,
+    /// Coins to attach as funds for the message
+    #[clap(long)]
+    funds: Vec<ParsedCoin>,
 }
 
 async fn wasm_execute_message(
@@ -424,19 +427,25 @@ async fn wasm_execute_message(
         contract,
         message,
         simulate,
+        funds,
     }: WasmExecuteMessageOpt,
 ) -> Result<()> {
     let msg = serde_json::from_str::<serde_json::Value>(&message)?;
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: contract.get_address_string(),
         msg: to_json_binary(&msg)?,
-        funds: vec![],
+        funds: funds.iter().map(Into::into).collect(),
     });
     println!("{}", serde_json::to_string(&msg)?);
 
     if let Some(sender) = simulate {
         let mut tx = TxBuilder::default();
-        tx.add_execute_message_bytes(contract, sender, vec![], message)?;
+        tx.add_execute_message_bytes(
+            contract,
+            sender,
+            funds.iter().map(Into::into).collect(),
+            message,
+        )?;
         let res = tx.simulate(cosmos, &[sender.get_address()]).await?;
         println!("Simulation successful. Gas used: {}", res.gas_used);
     }
