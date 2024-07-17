@@ -216,7 +216,7 @@ impl ConnectionError {
         match self {
             ConnectionError::SanityCheckFailed { grpc_url, source } => {
                 if pretty {
-                    write!(f, "Sanity check failed: {source}")
+                    write!(f, "Sanity check failed: {}", pretty_status(source, true))
                 } else {
                     write!(
                         f,
@@ -652,7 +652,11 @@ impl QueryErrorDetails {
     fn fmt_helper(&self, f: &mut std::fmt::Formatter, pretty: bool) -> std::fmt::Result {
         match self {
             QueryErrorDetails::Unknown(e) => {
-                write!(f, "Unknown gRPC status returned: {e:?}")
+                write!(
+                    f,
+                    "Unknown gRPC status returned: {}",
+                    pretty_status(e, pretty)
+                )
             }
             QueryErrorDetails::QueryTimeout(e) => {
                 write!(f, "Query timed out after: {e:?}")
@@ -662,31 +666,48 @@ impl QueryErrorDetails {
                 write!(f, "Not found returned from chain: {e}")
             }
             QueryErrorDetails::CosmosSdk { error_code, source } => {
-                write!(f, "Cosmos SDK error code {error_code} returned: {source:?}")
+                write!(
+                    f,
+                    "Cosmos SDK error code {error_code} returned: {}",
+                    pretty_status(source, pretty)
+                )
             }
             QueryErrorDetails::JsonParseError(e) => {
-                write!(f, "Error parsing message into expected type: {e:?}")
+                write!(
+                    f,
+                    "Error parsing message into expected type: {}",
+                    pretty_status(e, pretty)
+                )
             }
             QueryErrorDetails::FailedToExecute(e) => {
-                write!(f, "{e:?}")
+                write!(f, "Failed to execut message: {}", pretty_status(e, pretty))
             }
             QueryErrorDetails::HeightNotAvailable {
                 lowest_height,
                 source,
             } => {
-                write!(f, "Requested height not available, lowest height reported: {lowest_height:?}. {source:?}")
+                write!(
+                    f,
+                    "Requested height not available, lowest height reported: {lowest_height:?}. {}",
+                    pretty_status(source, pretty)
+                )
             }
             QueryErrorDetails::Unavailable { source, status } => {
                 write!(
                     f,
-                    "Error querying server, received HTTP status code {status}. {source:?}"
+                    "Error querying server, received HTTP status code {status}. {}",
+                    pretty_status(source, pretty)
                 )
             }
             QueryErrorDetails::Unimplemented { source } => {
-                write!(f, "Server does not implement expected services, it may not be a Cosmos gRPC endpoint. {source}")
+                write!(f, "Server does not implement expected services, it may not be a Cosmos gRPC endpoint. {}",pretty_status(source,pretty))
             }
             QueryErrorDetails::TransportError { source } => {
-                write!(f, "Transport error with gRPC endpoint. {source}")
+                write!(
+                    f,
+                    "Transport error with gRPC endpoint. {}",
+                    pretty_status(source, pretty)
+                )
             }
             QueryErrorDetails::BlocksLagDetected {
                 old_height,
@@ -704,24 +725,27 @@ impl QueryErrorDetails {
                 write!(f, "No new block time found in {}s ({}s allowed). Old height: {old_height}. New height: {new_height}.", age.as_secs(), age_allowed.as_secs())
             }
             QueryErrorDetails::AccountSequenceMismatch(e) => {
-                write!(f, "Account sequence mismatch: {e}")
+                write!(f, "Account sequence mismatch: {}", pretty_status(e, pretty))
             }
             QueryErrorDetails::RateLimited { source } => {
                 write!(
                     f,
-                    "You appear to be rate limited by the gRPC server: {source:?}"
+                    "You appear to be rate limited by the gRPC server: {}",
+                    pretty_status(source, pretty)
                 )
             }
             QueryErrorDetails::Forbidden { source } => {
                 write!(
                     f,
-                    "The gRPC server is returning a 'forbidden' response: {source:?}"
+                    "The gRPC server is returning a 'forbidden' response: {}",
+                    pretty_status(source, pretty)
                 )
             }
             QueryErrorDetails::NotGrpc { source } => {
                 write!(
                     f,
-                    "Server returned response that does not look like valid gRPC: {source:?}"
+                    "Server returned response that does not look like valid gRPC: {}",
+                    pretty_status(source, pretty)
                 )
             }
         }
@@ -773,7 +797,7 @@ impl Display for CosmosSdkError {
                 f.write_str("incorrect account sequence (32)")
             }
             CosmosSdkError::Other { code, codespace } => {
-                write!(f, "Cosmos SDK error {code} (codespace {codespace})")
+                write!(f, "code {code} (codespace {codespace})")
             }
         }
     }
@@ -1161,5 +1185,21 @@ pub struct PrettyError {
 impl Display for PrettyError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.source.fmt_helper(f, true)
+    }
+}
+
+fn pretty_status(status: &tonic::Status, pretty: bool) -> PrettyStatus {
+    PrettyStatus(status, pretty)
+}
+
+struct PrettyStatus<'a>(&'a tonic::Status, bool);
+
+impl Display for PrettyStatus<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if self.1 {
+            write!(f, "{}", self.0.message())
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
