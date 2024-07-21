@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 
-use crate::{codeid::strip_quotes, error::ChainParseError, Address};
+use crate::{error::ChainParseError, Address};
 
 /// Extension trait to add some helper methods to [TxResponse].
 pub trait TxResponseExt {
@@ -108,11 +108,14 @@ impl TxResponseExt for TxResponse {
         res.extend(
             self.events
                 .iter()
-                .filter(|event| event.r#type == "store_code")
+                .filter(|event| {
+                    event.r#type == "store_code"
+                        || event.r#type == "cosmwasm.wasm.v1.EventCodeStored"
+                })
                 .flat_map(|event| event.attributes.iter())
                 .filter(|attr| &*attr.key == b"code_id")
                 .flat_map(|attr| {
-                    std::str::from_utf8(&attr.value)
+                    std::str::from_utf8(strip_quotes_bytes(&attr.value))
                         .ok()
                         .and_then(|s| s.parse::<u64>().ok())
                 }),
@@ -129,4 +132,16 @@ impl TxResponseExt for TxResponse {
                 txhash: self.txhash.clone(),
             })
     }
+}
+
+fn strip_quotes(s: &str) -> &str {
+    s.strip_prefix('\"')
+        .and_then(|s| s.strip_suffix('\"'))
+        .unwrap_or(s)
+}
+
+fn strip_quotes_bytes(s: &[u8]) -> &[u8] {
+    s.strip_prefix(b"\"")
+        .and_then(|s| s.strip_suffix(b"\""))
+        .unwrap_or(s)
 }

@@ -33,12 +33,6 @@ impl CodeId {
     }
 }
 
-pub(crate) fn strip_quotes(s: &str) -> &str {
-    s.strip_prefix('\"')
-        .and_then(|s| s.strip_suffix('\"'))
-        .unwrap_or(s)
-}
-
 impl Cosmos {
     /// Convenience helper for uploading code to the blockchain
     pub async fn store_code(
