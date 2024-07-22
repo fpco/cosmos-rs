@@ -1059,6 +1059,7 @@ pub struct SingleNodeHealthReport {
     pub error_count: usize,
     pub first_request: Option<DateTime<Utc>>,
     pub total_query_count: u64,
+    pub total_error_count: u64,
 }
 
 /// Describes the health status of an individual node.
@@ -1133,11 +1134,22 @@ impl Display for SingleNodeHealthReport {
                 ConversionError::Overflow => "Overflow when converting since".to_owned(),
                 ConversionError::DivideByZero => "since is 0".to_owned(),
             });
+            let errors_per_minute = (|| {
+                let since = u64::try_from(since).map_err(|_| ConversionError::Overflow)?;
+                self.total_error_count
+                    .checked_div(since)
+                    .ok_or(ConversionError::DivideByZero)
+                    .map(|item| item.to_string())
+            })()
+            .unwrap_or_else(|err| match err {
+                ConversionError::Overflow => "Overflow when converting since".to_owned(),
+                ConversionError::DivideByZero => "since is 0".to_owned(),
+            });
 
             write!(
                 f,
-                ". First request: {} (Since {} minutes). Total queries: {} (RPM: {})",
-                first_request, since, self.total_query_count, rate_per_minute
+                ". First request: {} (Since {} minutes). Total queries: {} (RPM: {}). Total errors: {} (RPM: {})",
+                first_request, since, self.total_query_count, rate_per_minute, self.total_error_count, errors_per_minute
             )?;
         }
         Ok(())

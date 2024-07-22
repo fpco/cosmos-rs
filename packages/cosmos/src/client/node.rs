@@ -40,14 +40,18 @@ struct NodeInner {
 pub(crate) struct QueryCount {
     pub(crate) first_request: Option<DateTime<Utc>>,
     pub(crate) total_query_count: u64,
+    pub(crate) total_error_count: u64,
 }
 
 impl QueryCount {
-    pub(crate) fn incr(&mut self) {
+    pub(crate) fn incr(&mut self, is_error: bool) {
         if self.first_request.is_none() {
             self.first_request = Some(Utc::now());
         }
         self.total_query_count += 1;
+        if is_error {
+            self.total_error_count += 1;
+        }
     }
 }
 
@@ -188,7 +192,10 @@ impl Node {
     }
 
     pub(super) fn log_query_result(&self, res: QueryResult) {
-        self.node_inner.query_count.write().incr();
+        self.node_inner.query_count.write().incr(match res {
+            QueryResult::Success => false,
+            QueryResult::NetworkError { .. } | QueryResult::OtherError => true,
+        });
         let mut guard = self.node_inner.last_error.write();
         match res {
             QueryResult::Success | QueryResult::OtherError => {
@@ -227,6 +234,7 @@ impl Node {
         let QueryCount {
             first_request,
             total_query_count,
+            total_error_count,
         } = *self.node_inner.query_count.read();
         SingleNodeHealthReport {
             grpc_url: self.node_inner.grpc_url.clone(),
@@ -253,6 +261,7 @@ impl Node {
             }),
             first_request,
             total_query_count,
+            total_error_count,
         }
     }
 
