@@ -34,6 +34,17 @@ impl CodeId {
 }
 
 impl Cosmos {
+    pub(crate) fn compress_wasm_code(wasm_byte_code: &[u8]) -> Result<Vec<u8>, crate::Error> {
+        // https://github.com/cosmos/cosmjs/blob/f944892fd337af1ae8b5b269d2b2f68cdf2ad6cb/packages/cosmwasm-stargate/src/signingcosmwasmclient.ts#L67
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::new(9));
+        gzip_encoder
+            .write_all(wasm_byte_code)
+            .map_err(|err| crate::Error::WasmGzipFailed { source: err })?;
+        gzip_encoder
+            .finish()
+            .map_err(|err| crate::Error::WasmGzipFailed { source: err })
+    }
+
     /// Convenience helper for uploading code to the blockchain
     pub async fn store_code(
         &self,
@@ -41,14 +52,7 @@ impl Cosmos {
         wasm_byte_code: Vec<u8>,
         source: Option<PathBuf>,
     ) -> Result<CodeId, crate::Error> {
-        // https://github.com/cosmos/cosmjs/blob/f944892fd337af1ae8b5b269d2b2f68cdf2ad6cb/packages/cosmwasm-stargate/src/signingcosmwasmclient.ts#L67
-        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::new(9));
-        gzip_encoder
-            .write_all(&wasm_byte_code)
-            .map_err(|err| crate::Error::WasmGzipFailed { source: err })?;
-        let wasm_byte_code = gzip_encoder
-            .finish()
-            .map_err(|err| crate::Error::WasmGzipFailed { source: err })?;
+        let wasm_byte_code = Self::compress_wasm_code(&wasm_byte_code)?;
 
         let msg = MsgStoreCodeHelper {
             sender: wallet.get_address(),
@@ -102,6 +106,7 @@ impl Cosmos {
                 path: path.to_owned(),
                 source,
             })?;
+        let wasm_byte_code = Self::compress_wasm_code(&wasm_byte_code)?;
         let store_code = MsgStoreCodeHelper {
             sender: granter.get_address(),
             wasm_byte_code,
