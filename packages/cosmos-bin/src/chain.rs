@@ -1,9 +1,15 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{
-    proto::{cosmos::base::abci::v1beta1::TxResponse, traits::Message},
+    proto::{
+        cosmos::{
+            base::abci::v1beta1::TxResponse,
+            tx::v1beta1::{AuthInfo, Tx},
+        },
+        traits::Message,
+    },
     Address, BlockInfo, Cosmos, TxResponseExt,
 };
 
@@ -158,6 +164,28 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
             println!("Gas wanted: {gas_wanted}");
             println!("Gas used: {gas_used}");
             println!("Timestamp: {timestamp}");
+            let tx = tx.context("Missing tx field")?;
+            println!("Encoded length: {}", tx.encoded_len());
+            let Tx {
+                body: _,
+                auth_info,
+                signatures: _,
+            } = Tx::decode(&*tx.value)?;
+            let AuthInfo {
+                signer_infos,
+                fee,
+                tip: _,
+            } = auth_info.context("Missing auth_info field")?;
+            let fee = fee.context("Missing fee field")?;
+            print!("Fee: ");
+            for (idx, coin) in fee.amount.iter().enumerate() {
+                if idx != 0 {
+                    print!(", ");
+                }
+                print!("{}{}", coin.amount, coin.denom);
+            }
+            println!();
+            println!("Signer count: {}", signer_infos.len());
             if complete {
                 println!("Data: {data}");
                 for (idx, log) in logs.into_iter().enumerate() {
@@ -166,9 +194,6 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
                 for (idx, event) in events.into_iter().enumerate() {
                     println!("Event #{idx}: {event:?}");
                 }
-            }
-            if let Some(tx) = tx {
-                println!("Encoded length: {}", tx.encoded_len());
             }
         }
         Subcommand::ListTxsFor {
