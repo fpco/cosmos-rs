@@ -151,7 +151,22 @@ impl CosmosConfig {
                 .builder()
                 .await
                 .map_err(|source| CosmosConfigError::Builder { source }),
-            (Some(_), Some(_)) => todo!(),
+            (Some(network), Some(config)) => {
+                let mut builder = network
+                    .builder()
+                    .await
+                    .map_err(|source| CosmosConfigError::Builder { source })?;
+                config.apply_extra_config(&mut builder);
+                Ok(builder)
+            }
         }
+    }
+}
+
+impl CosmosNetwork {
+    /// Generating a builder, respecting the default config file.
+    pub async fn builder_with_config(&self) -> Result<CosmosBuilder, CosmosConfigError> {
+        let config = CosmosConfig::load()?;
+        config.builder_for(self.as_str()).await
     }
 }
