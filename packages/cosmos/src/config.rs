@@ -17,13 +17,13 @@ pub struct CosmosConfig {
     inner: CosmosConfigInner,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct CosmosConfigInner {
     #[serde(default)]
     network: HashMap<String, NetworkConfig>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 struct NetworkConfig {
     grpc: Option<String>,
@@ -35,6 +35,20 @@ struct NetworkConfig {
 }
 
 impl NetworkConfig {
+    fn apply_base_config(&self, builder: &mut CosmosBuilder) {
+        if let Some(grpc) = &self.grpc {
+            builder.set_grpc_url(grpc);
+        }
+        if let Some(chain_id) = self.chain_id.clone() {
+            builder.set_chain_id(chain_id);
+        }
+        if let Some(gas_coin) = self.gas_coin.clone() {
+            builder.set_gas_coin(gas_coin);
+        }
+        if let Some(hrp) = self.hrp {
+            builder.set_hrp(hrp);
+        }
+    }
     fn apply_extra_config(&self, builder: &mut CosmosBuilder) {
         for fallback in &self.grpc_fallbacks {
             builder.add_grpc_fallback_url(fallback);
@@ -156,6 +170,7 @@ impl CosmosConfig {
                     .builder()
                     .await
                     .map_err(|source| CosmosConfigError::Builder { source })?;
+                config.apply_base_config(&mut builder);
                 config.apply_extra_config(&mut builder);
                 Ok(builder)
             }
