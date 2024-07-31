@@ -3,6 +3,8 @@
 pub use address::{Address, AddressHrp, HasAddress, HasAddressHrp, PublicKeyMethod, RawAddress};
 pub use client::{BlockInfo, Cosmos, CosmosTxResponse, HasCosmos};
 pub use codeid::CodeId;
+#[cfg(feature = "config")]
+pub use config::{CosmosConfig, CosmosConfigError};
 pub use contract::{Contract, ContractAdmin, HasContract};
 pub use cosmos_builder::CosmosBuilder;
 pub use cosmos_network::CosmosNetwork;
@@ -20,6 +22,8 @@ mod address;
 mod authz;
 mod client;
 mod codeid;
+#[cfg(feature = "config")]
+mod config;
 mod contract;
 mod cosmos_builder;
 mod cosmos_network;
