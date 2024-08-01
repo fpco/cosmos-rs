@@ -252,6 +252,12 @@ impl CosmosConfig {
         let s = toml::to_string_pretty(&self.inner)
             .map_err(|source| CosmosConfigError::TomlSerialization { source })?;
         let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            fs_err::create_dir_all(parent).map_err(|source| CosmosConfigError::ConfigWrite {
+                source,
+                path: path.to_owned(),
+            })?;
+        }
         fs_err::write(path, s).map_err(|source| CosmosConfigError::ConfigWrite {
             source,
             path: path.to_owned(),
