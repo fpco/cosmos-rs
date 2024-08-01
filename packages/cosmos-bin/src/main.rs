@@ -2,6 +2,7 @@ mod authz;
 mod bank;
 mod chain;
 mod cli;
+mod config;
 mod contract;
 mod cw3;
 mod my_duration;
@@ -68,6 +69,7 @@ impl Subcommand {
                 let cosmos = opt.network_opt.build().await?;
                 cw3::go(cosmos, inner).await?;
             }
+            Subcommand::Config { opt: inner } => config::go(opt, inner)?,
         }
 
         Ok(())
