@@ -224,9 +224,7 @@ impl<T: HasAddress> HasAddress for &T {
 /// This library internally shares multiple copies of the same HRP for both
 /// efficiency and ease of use of this library: it allows both this data type,
 /// as well as [Address], to be [Copy].
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, serde::Serialize)]
 pub struct AddressHrp(&'static str);
 
 impl FromStr for AddressHrp {
@@ -234,6 +232,33 @@ impl FromStr for AddressHrp {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         AddressHrp::new(s)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AddressHrp {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(AddressHrpVisitor)
+    }
+}
+
+struct AddressHrpVisitor;
+
+impl<'de> Visitor<'de> for AddressHrpVisitor {
+    type Value = AddressHrp;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("AddressHrp")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse::<AddressHrp>()
+            .map_err(|e| E::custom(e.to_string()))
     }
 }
 

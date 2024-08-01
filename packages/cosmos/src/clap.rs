@@ -1,5 +1,7 @@
 //! Provides helpers for generating Cosmos values from command line parameters.
 
+use std::{path::PathBuf, str::FromStr};
+
 use crate::{error::BuilderError, AddressHrp, Cosmos, CosmosBuilder, CosmosNetwork};
 
 /// Command line options for connecting to a Cosmos network
@@ -7,7 +9,15 @@ use crate::{error::BuilderError, AddressHrp, Cosmos, CosmosBuilder, CosmosNetwor
 pub struct CosmosOpt {
     /// Which blockchain to connect to for grabbing blocks
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
-    pub network: Option<CosmosNetwork>,
+    pub network: Option<String>,
+    #[cfg(feature = "config")]
+    /// Config file for network default overrides
+    #[clap(long, env = "COSMOS_CONFIG", global = true)]
+    pub config: Option<PathBuf>,
+    #[cfg(feature = "config")]
+    /// Disable usage of config file overrides
+    #[clap(long, env = "COSMOS_CONFIG_DISABLE", global = true)]
+    pub config_disable: bool,
     /// Optional gRPC endpoint override
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub cosmos_grpc: Option<String>,
@@ -44,6 +54,17 @@ pub enum CosmosOptError {
     NoNetworkProvided { missing: String },
     #[error("{source}")]
     CosmosBuilderError { source: BuilderError },
+    #[error(transparent)]
+    NetworkParseError {
+        #[from]
+        source: strum::ParseError,
+    },
+    #[cfg(feature = "config")]
+    #[error(transparent)]
+    ConfigError {
+        #[from]
+        source: crate::CosmosConfigError,
+    },
 }
 
 impl CosmosOpt {
@@ -58,16 +79,50 @@ impl CosmosOpt {
             referer_header,
             gas_coin,
             hrp,
+            #[cfg(feature = "config")]
+            config,
+            #[cfg(feature = "config")]
+            config_disable,
         } = self;
 
         // Do the error checking here instead of in clap so that the field can
         // be global.
         let mut builder = match network {
             Some(network) => {
-                let mut builder = network
-                    .builder()
-                    .await
-                    .map_err(|source| CosmosOptError::CosmosBuilderError { source })?;
+                async fn builder_without_config(
+                    network: &str,
+                ) -> Result<CosmosBuilder, CosmosOptError> {
+                    CosmosNetwork::from_str(network)
+                        .map_err(|source| CosmosOptError::NetworkParseError { source })?
+                        .builder()
+                        .await
+                        .map_err(|source| CosmosOptError::CosmosBuilderError { source })
+                }
+                #[cfg(feature = "config")]
+                let mut builder = {
+                    use crate::{CosmosConfig, CosmosConfigError};
+                    if config_disable {
+                        builder_without_config(&network).await?
+                    } else {
+                        match &config {
+                            Some(config) => {
+                                CosmosConfig::load_from(config, true)?
+                                    .builder_for(&network)
+                                    .await?
+                            }
+                            None => match CosmosConfig::load() {
+                                Ok(config) => config.builder_for(&network).await?,
+                                Err(e @ CosmosConfigError::ProjectDirsNotFound) => {
+                                    tracing::warn!("{e}");
+                                    builder_without_config(&network).await?
+                                }
+                                Err(e) => return Err(e.into()),
+                            },
+                        }
+                    }
+                };
+                #[cfg(not(feature = "config"))]
+                let mut builder = builder_without_config(&network).await?;
                 if let Some(grpc) = cosmos_grpc {
                     builder.set_grpc_url(grpc);
                 }
@@ -83,6 +138,12 @@ impl CosmosOpt {
                 builder
             }
             None => {
+                #[cfg(feature = "config")]
+                if config.is_some() {
+                    tracing::warn!(
+                        "You provided a config file, but without a network name it will be ignored"
+                    );
+                }
                 let mut missing = vec![];
                 if cosmos_grpc.is_none() {
                     missing.push("COSMOS_GRPC");
