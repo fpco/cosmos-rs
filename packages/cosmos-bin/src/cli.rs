@@ -114,4 +114,9 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         opt: crate::cw3::Opt,
     },
+    /// Manage config file
+    Config {
+        #[clap(subcommand)]
+        opt: crate::config::Opt,
+    },
 }

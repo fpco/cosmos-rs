@@ -42,15 +42,17 @@ strum_macros = "0.26.2"
 tendermint-proto = "0.35.0"
 figment = { version = "0.10.19", features = ["env", "toml"], optional = true }
 directories = { version = "5.0.1", optional = true }
+toml = { version = "0.8.19", optional = true }
 
 [features]
 clap = ["dep:clap"]
-config = ["dep:figment", "dep:directories"]
+config = ["dep:figment", "dep:directories", "dep:toml"]
 default = ["rustls-tls", "compression"]
 compression = ["reqwest/gzip", "reqwest/brotli"]
 rustls-tls = ["reqwest/rustls-tls"]
 native-tls = ["reqwest/native-tls"]
 directories = ["dep:directories"]
+toml = ["dep:toml"]
 
 [dev-dependencies]
 quickcheck = "1"

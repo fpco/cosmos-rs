@@ -12,25 +12,26 @@ use figment::{
 use crate::{AddressHrp, CosmosBuilder, CosmosNetwork};
 
 /// Configuration overrides for individual network
+#[derive(Debug)]
 pub struct CosmosConfig {
     path: PathBuf,
     inner: CosmosConfigInner,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 struct CosmosConfigInner {
     #[serde(default)]
     network: HashMap<String, NetworkConfig>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 struct NetworkConfig {
     grpc: Option<String>,
     chain_id: Option<String>,
     gas_coin: Option<String>,
     hrp: Option<AddressHrp>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     grpc_fallbacks: Vec<String>,
 }
 
@@ -79,23 +80,30 @@ pub enum CosmosConfigError {
         path: PathBuf,
         network: String,
     },
+    #[error(transparent)]
+    TomlSerialization { source: toml::ser::Error },
+    #[error("Unable to write config to {}: {source}", path.display())]
+    ConfigWrite {
+        source: std::io::Error,
+        path: PathBuf,
+    },
 }
 
 impl CosmosConfig {
-    /// Load the config values from the default config file location
-    pub fn load() -> Result<CosmosConfig, CosmosConfigError> {
+    /// Find the default config file location
+    pub fn default_file() -> Result<PathBuf, CosmosConfigError> {
         let dirs = directories::ProjectDirs::from("com", "fpco", "cosmos-rs")
             .ok_or(CosmosConfigError::ProjectDirsNotFound)?;
-        let mut file = dirs.config_dir().to_owned();
-        file.push("config.toml");
-        Self::load_from(&file, false)
+        Ok(dirs.config_dir().join("config.toml"))
+    }
+
+    /// Load the config values from the default config file location
+    pub fn load() -> Result<CosmosConfig, CosmosConfigError> {
+        Self::load_from(&Self::default_file()?, false)
     }
 
     /// Load the config values from the specified file
-    pub(crate) fn load_from(
-        config: &Path,
-        required: bool,
-    ) -> Result<CosmosConfig, CosmosConfigError> {
+    pub fn load_from(config: &Path, required: bool) -> Result<CosmosConfig, CosmosConfigError> {
         if required && !config.exists() {
             return Err(CosmosConfigError::FileNotFound {
                 path: config.to_owned(),
@@ -175,6 +183,109 @@ impl CosmosConfig {
                 Ok(builder)
             }
         }
+    }
+
+    /// Print out a description of the config file
+    pub fn print(&self) {
+        println!("Location: {}", self.path.display());
+        let mut networks = self.inner.network.iter().collect::<Vec<_>>();
+        networks.sort_by_key(|x| x.0);
+        for (
+            network,
+            NetworkConfig {
+                grpc,
+                chain_id,
+                gas_coin,
+                hrp,
+                grpc_fallbacks,
+            },
+        ) in networks
+        {
+            println!();
+            println!("{network}");
+            if let Some(grpc) = grpc {
+                println!("Primary endpoint: {grpc}");
+            }
+            for (idx, fallback) in grpc_fallbacks.iter().enumerate() {
+                println!("Fallback #{}: {fallback}", idx + 1);
+            }
+            if let Some(chain_id) = chain_id {
+                println!("Chain ID: {chain_id}");
+            }
+            if let Some(gas_coin) = gas_coin {
+                println!("Gas coin: {gas_coin}");
+            }
+            if let Some(hrp) = hrp {
+                println!("Address prefix (HRP): {hrp}");
+            }
+        }
+    }
+
+    /// Add a new network to the config
+    pub fn new_network(
+        &mut self,
+        name: String,
+        grpc: String,
+        chain_id: String,
+        gas_coin: String,
+        hrp: AddressHrp,
+    ) {
+        self.inner.network.insert(
+            name,
+            NetworkConfig {
+                grpc: Some(grpc),
+                chain_id: Some(chain_id),
+                gas_coin: Some(gas_coin),
+                hrp: Some(hrp),
+                grpc_fallbacks: vec![],
+            },
+        );
+    }
+
+    /// Write the config to the original file.
+    pub fn save(&self) -> Result<(), CosmosConfigError> {
+        self.save_to(&self.path)
+    }
+
+    /// Write the config to the given file.
+    pub fn save_to(&self, path: impl AsRef<Path>) -> Result<(), CosmosConfigError> {
+        let s = toml::to_string_pretty(&self.inner)
+            .map_err(|source| CosmosConfigError::TomlSerialization { source })?;
+        let path = path.as_ref();
+        fs_err::write(path, s).map_err(|source| CosmosConfigError::ConfigWrite {
+            source,
+            path: path.to_owned(),
+        })
+    }
+
+    /// Set the primary gRPC endpoint
+    pub fn set_grpc(&mut self, name: String, url: String) {
+        self.inner.network.entry(name).or_default().grpc = Some(url);
+    }
+
+    /// Set the chain ID
+    pub fn set_chain_id(&mut self, name: String, chain_id: String) {
+        self.inner.network.entry(name).or_default().chain_id = Some(chain_id);
+    }
+
+    /// Set the Human Readable Part (HRP)
+    pub fn set_hrp(&mut self, name: String, hrp: AddressHrp) {
+        self.inner.network.entry(name).or_default().hrp = Some(hrp);
+    }
+
+    /// Set the gas coin
+    pub fn set_gas_coin(&mut self, name: String, gas_coin: String) {
+        self.inner.network.entry(name).or_default().gas_coin = Some(gas_coin);
+    }
+
+    /// Add a gRPC fallback
+    pub fn add_grpc_fallback(&mut self, name: String, url: String) {
+        self.inner
+            .network
+            .entry(name)
+            .or_default()
+            .grpc_fallbacks
+            .push(url);
     }
 }
 
