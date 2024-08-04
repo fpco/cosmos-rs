@@ -62,7 +62,7 @@ impl SeedPhrase {
     }
 
     /// Make a new [SeedPhrase] using the given derivation path.
-    fn with_derivation_path(mut self, derivation_path: Option<Arc<DerivationPath>>) -> Self {
+    pub fn with_derivation_path(mut self, derivation_path: Option<Arc<DerivationPath>>) -> Self {
         self.derivation_path = derivation_path;
         self
     }
