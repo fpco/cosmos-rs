@@ -673,6 +673,11 @@ impl Cosmos {
 
         Ok(())
     }
+
+    /// Get the denom of this chain's gas coin
+    pub fn get_gas_coin(&self) -> &str {
+        self.pool.builder.gas_coin()
+    }
 }
 
 #[derive(Clone)]
@@ -1148,7 +1153,8 @@ impl Cosmos {
         self.current_gas_price().await.base
     }
 
-    async fn current_gas_price(&self) -> CurrentGasPrice {
+    /// Get the current gas price information
+    pub async fn current_gas_price(&self) -> CurrentGasPrice {
         match &self.get_cosmos_builder().gas_price_method {
             Some(method) => method.current(self).await,
             None => DEFAULT_GAS_PRICE,

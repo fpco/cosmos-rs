@@ -67,6 +67,12 @@ impl SeedPhrase {
         self
     }
 
+    /// Make a new numbered [Wallet] using the default derivation path for the given chain.
+    pub fn with_numbered(self, index: u64, hrp: AddressHrp) -> Result<Wallet, WalletError> {
+        self.with_derivation_path(Some(hrp.default_derivation_path_with_index(index)))
+            .with_hrp(hrp)
+    }
+
     /// Make a new [SeedPhrase] using a Cosmos derivation path and the given index.
     pub fn with_cosmos_numbered(self, index: u64) -> Self {
         self.with_derivation_path(Some(
