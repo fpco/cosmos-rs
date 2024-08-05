@@ -680,7 +680,7 @@ impl QueryErrorDetails {
                 )
             }
             QueryErrorDetails::FailedToExecute(e) => {
-                write!(f, "Failed to execut message: {}", pretty_status(e, pretty))
+                write!(f, "Failed to execute message: {}", pretty_status(e, pretty))
             }
             QueryErrorDetails::HeightNotAvailable {
                 lowest_height,
