@@ -224,9 +224,10 @@ pub(crate) async fn go(Opt { subcommand }: Opt, cosmos: Cosmos) -> Result<()> {
         } => {
             let address_type = cosmos.get_address_hrp();
             let contract = cosmos.make_contract(address);
-            contract
+            let tx = contract
                 .migrate_binary(&tx_opt.get_wallet(address_type)?, code_id, msg)
                 .await?;
+            println!("Transaction hash: {}", tx.txhash);
         }
         Subcommand::Execute {
             tx_opt,

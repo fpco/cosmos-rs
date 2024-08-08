@@ -310,7 +310,7 @@ impl Contract {
         wallet: &Wallet,
         code_id: u64,
         msg: impl serde::Serialize,
-    ) -> Result<(), crate::Error> {
+    ) -> Result<TxResponse, crate::Error> {
         self.migrate_binary(wallet, code_id, serde_json::to_vec(&msg)?)
             .await
     }
@@ -321,15 +321,14 @@ impl Contract {
         wallet: &Wallet,
         code_id: u64,
         msg: impl Into<Vec<u8>>,
-    ) -> Result<(), crate::Error> {
+    ) -> Result<TxResponse, crate::Error> {
         let msg = MsgMigrateContract {
             sender: wallet.get_address_string(),
             contract: self.get_address_string(),
             msg: msg.into(),
             code_id,
         };
-        wallet.broadcast_message(&self.client, msg).await?;
-        Ok(())
+        wallet.broadcast_message(&self.client, msg).await
     }
 
     /// Get the contract info metadata
