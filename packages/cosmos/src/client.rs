@@ -855,19 +855,22 @@ impl Cosmos {
         Ok(res.into_inner().data)
     }
 
-    fn txres_to_pair(
+    fn txres_to_tuple(
         txres: GetTxResponse,
         action: Action,
-    ) -> Result<(TxBody, TxResponse), crate::Error> {
-        let txbody = txres
-            .tx
+    ) -> Result<(TxBody, AuthInfo, TxResponse), crate::Error> {
+        let tx = txres.tx.ok_or_else(|| crate::Error::InvalidChainResponse {
+            message: "Missing tx field".to_owned(),
+            action: action.clone().into(),
+        })?;
+        let txbody = tx.body.ok_or_else(|| crate::Error::InvalidChainResponse {
+            message: "Missing tx.body field".to_owned(),
+            action: action.clone().into(),
+        })?;
+        let auth_info = tx
+            .auth_info
             .ok_or_else(|| crate::Error::InvalidChainResponse {
-                message: "Missing tx field".to_owned(),
-                action: action.clone().into(),
-            })?
-            .body
-            .ok_or_else(|| crate::Error::InvalidChainResponse {
-                message: "Missing tx.body field".to_owned(),
+                message: "Missing tx.auth_info field".to_owned(),
                 action: action.clone().into(),
             })?;
         let txres = txres
@@ -876,7 +879,7 @@ impl Cosmos {
                 message: "Missing tx_response field".to_owned(),
                 action: action.clone().into(),
             })?;
-        Ok((txbody, txres))
+        Ok((txbody, auth_info, txres))
     }
 
     /// Get a transaction, failing immediately if not present
@@ -886,7 +889,7 @@ impl Cosmos {
     pub async fn get_transaction_body(
         &self,
         txhash: impl Into<String>,
-    ) -> Result<(TxBody, TxResponse), crate::Error> {
+    ) -> Result<(TxBody, AuthInfo, TxResponse), crate::Error> {
         let txhash = txhash.into();
         let action = Action::GetTransactionBody(txhash.clone());
         let txres = self
@@ -899,7 +902,7 @@ impl Cosmos {
             .run()
             .await?
             .into_inner();
-        Self::txres_to_pair(txres, action)
+        Self::txres_to_tuple(txres, action)
     }
 
     /// Get a transaction with more aggressive fallback usage.
@@ -911,7 +914,7 @@ impl Cosmos {
     pub async fn get_transaction_with_fallbacks(
         &self,
         txhash: impl Into<String>,
-    ) -> Result<(TxBody, TxResponse), crate::Error> {
+    ) -> Result<(TxBody, AuthInfo, TxResponse), crate::Error> {
         let txhash = txhash.into();
         let action = Action::GetTransactionBody(txhash.clone());
         let res = self
@@ -925,7 +928,7 @@ impl Cosmos {
             .run()
             .await;
         match res {
-            Ok(txres) => Self::txres_to_pair(txres.into_inner(), action),
+            Ok(txres) => Self::txres_to_tuple(txres.into_inner(), action),
             Err(e) => {
                 for node in self.pool.node_chooser.all_nodes() {
                     let _permit = self.pool.get_node_permit().await;
@@ -938,7 +941,7 @@ impl Cosmos {
                         )
                         .await
                     {
-                        return Self::txres_to_pair(txres.into_inner(), action);
+                        return Self::txres_to_tuple(txres.into_inner(), action);
                     }
                 }
                 Err(e.into())
@@ -952,7 +955,7 @@ impl Cosmos {
     pub async fn wait_for_transaction(
         &self,
         txhash: impl Into<String>,
-    ) -> Result<(TxBody, TxResponse), crate::Error> {
+    ) -> Result<(TxBody, AuthInfo, TxResponse), crate::Error> {
         self.wait_for_transaction_with_action(txhash, None).await
     }
 
@@ -960,7 +963,7 @@ impl Cosmos {
         &self,
         txhash: impl Into<String>,
         action: Option<Action>,
-    ) -> Result<(TxBody, TxResponse), crate::Error> {
+    ) -> Result<(TxBody, AuthInfo, TxResponse), crate::Error> {
         const DELAY_SECONDS: u64 = 2;
         let txhash = txhash.into();
         for attempt in 1..=self.pool.builder.transaction_attempts() {
@@ -978,7 +981,7 @@ impl Cosmos {
             match txres {
                 Ok(txres) => {
                     let txres = txres.into_inner();
-                    return Self::txres_to_pair(
+                    return Self::txres_to_tuple(
                         txres,
                         action
                             .clone()
@@ -1753,7 +1756,7 @@ impl TxBuilder {
                 txhash: res.txhash.clone(),
             };
 
-            let (_, res) = cosmos
+            let (_, _, res) = cosmos
                 .wait_for_transaction_with_action(res.txhash, Some(action.clone()))
                 .await?;
             if !self.skip_code_check && res.code != 0 {
