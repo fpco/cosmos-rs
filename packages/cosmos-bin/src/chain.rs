@@ -148,7 +148,7 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
                 tx,
                 timestamp,
                 events,
-            } = cosmos.get_transaction_body(txhash).await?.1;
+            } = cosmos.get_transaction_body(txhash).await?.2;
             println!("Height: {height}");
             println!("Code: {code}");
             println!("Codespace: {codespace}");
@@ -246,14 +246,14 @@ async fn account_info(cosmos: Cosmos, address: Address) -> Result<()> {
 }
 
 async fn code_id_from_tx(cosmos: Cosmos, txhash: String) -> Result<()> {
-    let (_, txres) = cosmos.get_transaction_body(txhash).await?;
+    let (_, _, txres) = cosmos.get_transaction_body(txhash).await?;
     let code_id = txres.parse_first_stored_code_id()?;
     tracing::info!("Code ID: {code_id}");
     Ok(())
 }
 
 async fn contract_address_from_tx(cosmos: Cosmos, txhash: String) -> Result<()> {
-    let (_, tx) = cosmos.wait_for_transaction(&txhash).await?;
+    let (_, _, tx) = cosmos.wait_for_transaction(&txhash).await?;
     let addrs = tx.parse_instantiated_contracts()?;
 
     anyhow::ensure!(
@@ -317,7 +317,7 @@ async fn block_gas_report(
         let mut gas_wanted = 0;
         let txcount = block.txhashes.len();
         for txhash in block.txhashes {
-            let (_, tx) = cosmos.get_transaction_body(txhash).await?;
+            let (_, _, tx) = cosmos.get_transaction_body(txhash).await?;
             gas_used += tx.gas_used;
             gas_wanted += tx.gas_wanted;
         }
