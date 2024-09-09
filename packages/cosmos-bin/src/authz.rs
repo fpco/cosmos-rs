@@ -8,7 +8,9 @@ use base64::Engine;
 use chrono::{DateTime, Utc};
 use cosmos::{
     messages::{MsgExecHelper, MsgGrantHelper},
-    proto::cosmwasm::wasm::v1::MsgExecuteContract,
+    proto::{
+        cosmos::authz::v1beta1::MsgGrant, cosmwasm::wasm::v1::MsgExecuteContract, traits::Message,
+    },
     Address, Cosmos, HasAddress, HasAddressHrp, ParsedCoin, TxBuilder, TxMessage,
 };
 
@@ -73,6 +75,11 @@ enum Subcommand {
         #[clap(long)]
         granter: Address,
     },
+    /// Parse a base64-encoded grant string from a previous grant transaction
+    ParseGrant {
+        /// Base64-encoded string
+        grant: String,
+    },
 }
 
 pub(crate) async fn go(cosmos: Cosmos, Opt { sub }: Opt) -> Result<()> {
@@ -109,6 +116,11 @@ pub(crate) async fn go(cosmos: Cosmos, Opt { sub }: Opt) -> Result<()> {
             funds,
             granter,
         } => execute_contract(cosmos, tx_opt, address, msg, funds, granter).await?,
+        Subcommand::ParseGrant { grant } => {
+            let grant = base64::engine::general_purpose::STANDARD_NO_PAD.decode(grant)?;
+            let grant = MsgGrant::decode(&*grant)?;
+            println!("{grant:#?}");
+        }
     }
 
     Ok(())
