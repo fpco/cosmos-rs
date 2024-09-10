@@ -7,6 +7,7 @@ use cosmos::{
     },
     Address, ContractAdmin, Cosmos, HasAddress, HasAddressHrp, ParsedCoin, RawAddress, TxBuilder,
 };
+use cosmwasm_std::storage_keys::namespace_with_key;
 
 use crate::cli::TxOpt;
 
@@ -77,9 +78,10 @@ enum Subcommand {
     RawQuery {
         /// Contract address
         address: Address,
-        /// Key
-        key: String,
+        /// Keys, combined using the same mechanism as cw-storage-plus Maps
+        key: Vec<String>,
         /// Optional Height. Use latest if not passed.
+        #[clap(long)]
         height: Option<u64>,
     },
     /// Migrate contract
@@ -209,6 +211,12 @@ pub(crate) async fn go(Opt { subcommand }: Opt, cosmos: Cosmos) -> Result<()> {
             key,
             height,
         } => {
+            anyhow::ensure!(!key.is_empty(), "Must provide at least one key");
+            let mut namespace = Vec::with_capacity(key.len() - 1);
+            for key in key.iter().take(key.len() - 1) {
+                namespace.push(key.as_bytes());
+            }
+            let key = namespace_with_key(&namespace, key[key.len() - 1].as_bytes());
             let cosmos = cosmos.at_height(height);
             let x = cosmos.make_contract(address).query_raw(key).await?;
             let stdout = std::io::stdout();
