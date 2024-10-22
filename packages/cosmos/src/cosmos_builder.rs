@@ -121,14 +121,7 @@ impl CosmosBuilder {
     }
 
     /// gRPC fallback URLs
-    pub fn grpc_fallback_urls_ref(&self) -> Vec<&String> {
-        self.grpc_fallback_urls
-            .iter()
-            .map(|url| url.as_ref())
-            .collect()
-    }
-
-    pub(crate) fn grpc_fallback_urls(&self) -> &Vec<Arc<String>> {
+    pub fn grpc_fallback_urls(&self) -> &Vec<Arc<String>> {
         &self.grpc_fallback_urls
     }
 
