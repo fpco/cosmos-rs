@@ -120,7 +120,8 @@ impl CosmosBuilder {
         self.grpc_fallback_urls.push(url.into().into());
     }
 
-    pub(crate) fn grpc_fallback_urls(&self) -> &Vec<Arc<String>> {
+    /// gRPC fallback URLs
+    pub fn grpc_fallback_urls(&self) -> &Vec<Arc<String>> {
         &self.grpc_fallback_urls
     }
 
