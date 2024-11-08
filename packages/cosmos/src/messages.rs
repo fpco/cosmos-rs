@@ -16,7 +16,6 @@ use cosmos_sdk_proto::{
     traits::Message,
 };
 
-
 use crate::{error::StringOrBytes, Address, HasAddress, TxMessage};
 
 /// A local version of [MsgExec] with extra information for nice error messages.
