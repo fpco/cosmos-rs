@@ -52,7 +52,7 @@ impl SeedPhrase {
     /// Note that this should be considered security-sensitive content.
     pub fn phrase(&self) -> String {
         let mut phrase = String::new();
-        for (idx, word) in self.mnemonic.word_iter().enumerate() {
+        for (idx, word) in self.mnemonic.words().enumerate() {
             if idx != 0 {
                 phrase.push(' ');
             }

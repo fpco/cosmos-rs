@@ -481,7 +481,6 @@ impl Cosmos {
         if !all_nodes_broadcast {
             set.abort_all();
         }
-
         res.map_err(|first_error| {
             let (err, grpc_url) = match first_error {
                 Some(pair) => pair,
