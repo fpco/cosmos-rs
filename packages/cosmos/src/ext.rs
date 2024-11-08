@@ -63,12 +63,11 @@ impl TxResponseExt for TxResponse {
                 .filter(|event| event.r#type == "instantiate")
                 .flat_map(|event| event.attributes.iter())
                 .filter(|attr| {
-                    &*attr.key == b"_contract_address" || &*attr.key == b"contract_address"
+                    &*attr.key == "_contract_address" || &*attr.key == "contract_address"
                 })
                 .flat_map(|attr| {
-                    std::str::from_utf8(&attr.value)
-                        .ok()
-                        .and_then(|s| s.parse::<Address>().ok())
+                    let result: Result<Address, _> = attr.value.clone().parse();
+                    result
                 }),
         );
 
@@ -113,11 +112,10 @@ impl TxResponseExt for TxResponse {
                         || event.r#type == "cosmwasm.wasm.v1.EventCodeStored"
                 })
                 .flat_map(|event| event.attributes.iter())
-                .filter(|attr| &*attr.key == b"code_id")
+                .filter(|attr| &*attr.key == "code_id")
                 .flat_map(|attr| {
-                    std::str::from_utf8(strip_quotes_bytes(&attr.value))
-                        .ok()
-                        .and_then(|s| s.parse::<u64>().ok())
+                    let code_id = strip_quotes(&attr.value);
+                    code_id.parse::<u64>().ok()
                 }),
         );
 
@@ -137,11 +135,5 @@ impl TxResponseExt for TxResponse {
 fn strip_quotes(s: &str) -> &str {
     s.strip_prefix('\"')
         .and_then(|s| s.strip_suffix('\"'))
-        .unwrap_or(s)
-}
-
-fn strip_quotes_bytes(s: &[u8]) -> &[u8] {
-    s.strip_prefix(b"\"")
-        .and_then(|s| s.strip_suffix(b"\""))
         .unwrap_or(s)
 }
