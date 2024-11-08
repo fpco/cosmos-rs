@@ -132,7 +132,7 @@ impl CosmosBuilder {
 
         let grpc_endpoint = if grpc_url.starts_with("https://") {
             grpc_endpoint
-                .tls_config(ClientTlsConfig::new())
+                .tls_config(ClientTlsConfig::new().with_native_roots())
                 .map_err(|source| BuilderError::TlsConfig {
                     grpc_url: grpc_url.clone(),
                     source: source.into(),
