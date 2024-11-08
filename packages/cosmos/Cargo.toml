@@ -36,8 +36,8 @@ tiny-keccak = { version = "2.0", features = ["keccak"] }
 http = "1.1.0"
 cosmwasm-std = ">=1.5.3, <3"
 flate2 = { version = "1.0.34", features = ["zlib"] }
-strum = "0.26.2"
-strum_macros = "0.26.2"
+strum = "0.26.3"
+strum_macros = "0.26.4"
 tendermint-proto = "0.40.0"
 figment = { version = "0.10.19", features = ["env", "toml"], optional = true }
 directories = { version = "5.0.1", optional = true }
