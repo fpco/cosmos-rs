@@ -171,6 +171,7 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
                 auth_info,
                 signatures: _,
             } = Tx::decode(&*tx.value)?;
+            #[allow(deprecated)]
             let AuthInfo {
                 signer_infos,
                 fee,

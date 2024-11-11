@@ -66,7 +66,7 @@ impl TokenFactory {
                 if evt.r#type == "create_denom" {
                     evt.attributes.iter().find_map(|attr| {
                         if attr.key == "new_token_denom" {
-                            Some(std::str::from_utf8(&attr.value).unwrap().to_string())
+                            Some(attr.value.clone())
                         } else {
                             None
                         }

@@ -13,9 +13,8 @@ use cosmos_sdk_proto::{
         MsgExecuteContract, MsgInstantiateContract, MsgMigrateContract, MsgStoreCode,
         MsgUpdateAdmin,
     },
+    traits::Message,
 };
-use prost::Message;
-use prost_types::Timestamp;
 
 use crate::{error::StringOrBytes, Address, HasAddress, TxMessage};
 
@@ -74,7 +73,7 @@ impl From<MsgGrantHelper> for TxMessage {
             "{granter} grants {grantee} authorization for {authorization} until {expiration:?}"
         );
         let authorization = GenericAuthorization { msg: authorization };
-        let authorization = prost_types::Any {
+        let authorization = cosmos_sdk_proto::Any {
             type_url: "/cosmos.authz.v1beta1.GenericAuthorization".to_owned(),
             value: authorization.encode_to_vec(),
         };
@@ -94,8 +93,8 @@ impl From<MsgGrantHelper> for TxMessage {
     }
 }
 
-fn datetime_to_timestamp(x: DateTime<Utc>) -> Timestamp {
-    prost_types::Timestamp {
+fn datetime_to_timestamp(x: DateTime<Utc>) -> cosmos_sdk_proto::Timestamp {
+    cosmos_sdk_proto::Timestamp {
         seconds: x.timestamp(),
         nanos: x
             .timestamp_subsec_nanos()

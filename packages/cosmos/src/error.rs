@@ -908,7 +908,7 @@ impl QueryErrorDetails {
         }
 
         if err.code() == tonic::Code::Unavailable {
-            let http = err.clone().to_http();
+            let http = err.clone().into_http();
             return QueryErrorDetails::Unavailable {
                 source: err,
                 status: http.status(),

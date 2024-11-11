@@ -481,7 +481,6 @@ impl Cosmos {
         if !all_nodes_broadcast {
             set.abort_all();
         }
-
         res.map_err(|first_error| {
             let (err, grpc_url) = match first_error {
                 Some(pair) => pair,
@@ -825,6 +824,7 @@ impl Cosmos {
                     QueryAllBalancesRequest {
                         address: address.get_address_string(),
                         pagination: pagination.take(),
+                        resolve_denom: true,
                     },
                     Action::QueryAllBalances(address),
                 )
@@ -1023,11 +1023,12 @@ impl Cosmos {
         // deprecated. https://docs.rs/cosmos-sdk-proto/0.21.1/cosmos_sdk_proto/cosmos/tx/v1beta1/struct.GetTxsEventRequest.html#structfield.pagination
         #[allow(deprecated)]
         let req = GetTxsEventRequest {
-            events: vec![format!("message.sender='{address}'")],
+            events: vec![],
             pagination: None,
             order_by: OrderBy::Asc as i32,
             page: page.unwrap_or(1),
             limit: limit.unwrap_or(10),
+            query: format!("message.sender='{address}'"),
         };
         self.perform_query(req, Action::ListTransactionsFor(address))
             .run()
@@ -1273,9 +1274,9 @@ pub struct BlockInfo {
 impl BlockInfo {
     fn new(
         action: Action,
-        block_id: Option<tendermint_proto::v0_34::types::BlockId>,
+        block_id: Option<tendermint_proto::types::BlockId>,
         sdk_block: Option<cosmos_sdk_proto::cosmos::base::tendermint::v1beta1::Block>,
-        block: Option<tendermint_proto::v0_34::types::Block>,
+        block: Option<tendermint_proto::types::Block>,
         height: Option<i64>,
     ) -> Result<BlockInfo, crate::Error> {
         (|| {
@@ -1576,6 +1577,7 @@ impl TxBuilder {
         let gas_coin = cosmos.pool.builder.gas_coin();
 
         // First simulate the request with no signature and fake gas
+        #[allow(deprecated)]
         let simulate_tx = Tx {
             auth_info: Some(AuthInfo {
                 fee: Some(Fee {
@@ -1674,6 +1676,7 @@ impl TxBuilder {
                 denom: cosmos.pool.builder.gas_coin().to_owned(),
                 amount,
             };
+            #[allow(deprecated)]
             let auth_info = AuthInfo {
                 signer_infos: vec![self.make_signer_info(sequence, Some(wallet))],
                 fee: Some(Fee {
