@@ -824,7 +824,7 @@ impl Cosmos {
                     QueryAllBalancesRequest {
                         address: address.get_address_string(),
                         pagination: pagination.take(),
-                        resolve_denom: true,
+                        resolve_denom: false,
                     },
                     Action::QueryAllBalances(address),
                 )
