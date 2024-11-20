@@ -42,6 +42,7 @@ tendermint-proto = "0.40.0"
 figment = { version = "0.10.19", features = ["env", "toml"], optional = true }
 directories = { version = "5.0.1", optional = true }
 toml = { version = "0.8.19", optional = true }
+secp256k1 = { version = "0.30", features = ["hashes"] }
 
 [features]
 clap = ["dep:clap"]

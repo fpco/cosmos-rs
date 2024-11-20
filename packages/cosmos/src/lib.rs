@@ -34,6 +34,7 @@ mod parsed_coin;
 mod tokenfactory;
 mod txbuilder;
 mod wallet;
+mod crypto;
 
 #[cfg(feature = "clap")]
 pub mod clap;
