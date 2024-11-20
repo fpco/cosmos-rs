@@ -17,6 +17,7 @@ pub use parsed_coin::ParsedCoin;
 pub use tokenfactory::TokenFactory;
 pub use txbuilder::{TxBuilder, TxMessage};
 pub use wallet::{SeedPhrase, Wallet};
+pub use crypto::CosmosSecp256k1;
 
 mod address;
 mod authz;
