@@ -1,10 +1,9 @@
-extern crate secp256k1;
 extern crate rand;
 extern crate base64;
 
-use secp256k1::SecretKey;
 use rand::rngs::OsRng;
 use rand::RngCore;
+use bitcoin::secp256k1::SecretKey;
 
 /// Represents the secp256k1 crypto algorithm elliptic curve.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
@@ -21,7 +20,7 @@ impl CosmosSecp256k1 {
         rng.fill_bytes(&mut secret_key_bytes);
     
         // Create the secret key from the random bytes
-        let secret_key = SecretKey::from_byte_array(&secret_key_bytes).expect("32 bytes, within curve order");
+        let secret_key = SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order");
     
         secret_key
     }
@@ -29,7 +28,7 @@ impl CosmosSecp256k1 {
 
 #[cfg(test)]
 mod tests {
-    use secp256k1::{PublicKey, Secp256k1};
+    use bitcoin::secp256k1::{PublicKey, Secp256k1};
 
     use super::*;
 
