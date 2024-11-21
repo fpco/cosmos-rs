@@ -9,6 +9,7 @@ mod my_duration;
 mod nft;
 mod tokenfactory;
 mod wallet;
+mod crypto;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -70,6 +71,9 @@ impl Subcommand {
                 cw3::go(cosmos, inner).await?;
             }
             Subcommand::Config { opt: inner } => config::go(opt, inner)?,
+            Subcommand::Crypto { opt } => {
+                crypto::go(opt).await?;
+            }
         }
 
         Ok(())

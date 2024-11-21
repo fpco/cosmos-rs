@@ -13,16 +13,14 @@ impl CosmosSecp256k1 {
     /// Generates a private key using secp256k1 elliptic curve.
     pub fn gen_priv_key() -> SecretKey {
         // Create a random number generator
-        let mut rng = OsRng::default();
+        let mut rng = OsRng;
     
         // Generate a random 32-byte array
         let mut secret_key_bytes = [0u8; 32];
         rng.fill_bytes(&mut secret_key_bytes);
     
         // Create the secret key from the random bytes
-        let secret_key = SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order");
-    
-        secret_key
+        SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order")
     }
 }
 

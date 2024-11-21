@@ -119,4 +119,9 @@ pub(crate) enum Subcommand {
         #[clap(subcommand)]
         opt: crate::config::Opt,
     },
+    /// Management of cryptographic operations
+    Crypto {
+        #[clap(flatten)]
+        opt: crate::crypto::Opt,
+    },
 }
