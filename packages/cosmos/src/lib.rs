@@ -10,7 +10,7 @@ pub use cosmos_builder::CosmosBuilder;
 pub use cosmos_network::CosmosNetwork;
 pub use cosmos_sdk_proto as proto;
 pub use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
-pub use crypto::CosmosSecp256k1;
+pub use crypto::K256;
 pub use error::Error;
 pub use ext::TxResponseExt;
 pub use gas_multiplier::DynamicGasMultiplier;

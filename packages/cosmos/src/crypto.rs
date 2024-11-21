@@ -7,9 +7,9 @@ use rand::RngCore;
 
 /// Represents the secp256k1 crypto algorithm elliptic curve.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Ord, PartialOrd)]
-pub struct CosmosSecp256k1;
+pub struct K256;
 
-impl CosmosSecp256k1 {
+impl K256 {
     /// Generates a private key using secp256k1 elliptic curve.
     pub fn gen_priv_key() -> SecretKey {
         let mut rng = OsRng;
@@ -31,7 +31,7 @@ mod tests {
         let secp = Secp256k1::new();
 
         // Generate a new private key
-        let private_key = CosmosSecp256k1::gen_priv_key();
+        let private_key = K256::gen_priv_key();
 
         // Generate the corresponding public key
         let public_key = PublicKey::from_secret_key(&secp, &private_key);

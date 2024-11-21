@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmos::CosmosSecp256k1;
+use cosmos::K256;
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
@@ -10,13 +10,13 @@ pub(crate) struct Opt {
 #[derive(clap::Parser)]
 enum Subcommand {
     /// Generate a Secp256k1 Private key
-    GenSecp256k1PrivKey {},
+    GenK256PrivKey {},
 }
 
 pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
     match sub {
-        Subcommand::GenSecp256k1PrivKey {} => {
-            let private_key = CosmosSecp256k1::gen_priv_key();
+        Subcommand::GenK256PrivKey {} => {
+            let private_key = K256::gen_priv_key();
             let private_key_hex = hex::encode(private_key.secret_bytes()).to_uppercase();
             println!("Private Key: {}", private_key_hex);
         }
