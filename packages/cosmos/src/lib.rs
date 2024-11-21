@@ -10,6 +10,7 @@ pub use cosmos_builder::CosmosBuilder;
 pub use cosmos_network::CosmosNetwork;
 pub use cosmos_sdk_proto as proto;
 pub use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
+pub use crypto::CosmosSecp256k1;
 pub use error::Error;
 pub use ext::TxResponseExt;
 pub use gas_multiplier::DynamicGasMultiplier;
@@ -17,7 +18,6 @@ pub use parsed_coin::ParsedCoin;
 pub use tokenfactory::TokenFactory;
 pub use txbuilder::{TxBuilder, TxMessage};
 pub use wallet::{SeedPhrase, Wallet};
-pub use crypto::CosmosSecp256k1;
 
 mod address;
 mod authz;
@@ -28,6 +28,7 @@ mod config;
 mod contract;
 mod cosmos_builder;
 mod cosmos_network;
+mod crypto;
 mod ext;
 mod gas_multiplier;
 mod injective;
@@ -35,7 +36,6 @@ mod parsed_coin;
 mod tokenfactory;
 mod txbuilder;
 mod wallet;
-mod crypto;
 
 #[cfg(feature = "clap")]
 pub mod clap;

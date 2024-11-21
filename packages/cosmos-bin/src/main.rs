@@ -4,12 +4,12 @@ mod chain;
 mod cli;
 mod config;
 mod contract;
+mod crypto;
 mod cw3;
 mod my_duration;
 mod nft;
 mod tokenfactory;
 mod wallet;
-mod crypto;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
