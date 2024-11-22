@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmos::{AddressHrp, RawAddress, SeedPhrase};
+use cosmos::{proto::tendermint::crypto::public_key, AddressHrp, RawAddress, SeedPhrase};
 
 use crate::gen_wallet;
 
@@ -30,6 +30,8 @@ enum Subcommand {
         /// Destination address HRP (human-readable part)
         hrp: AddressHrp,
     },
+    /// Generate a Secp256k1 Private/Public key pair
+    GenKeyPair {},
 }
 
 pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
@@ -44,6 +46,17 @@ pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
         } => {
             println!("{}", orig.with_hrp(address_type));
         }
+        Subcommand::GenKeyPair {} => gen_key_pair()?
     }
+    Ok(())
+}
+
+fn gen_key_pair() -> Result<()> {
+    let xpriv = cosmos::Wallet::gen_priv_key();
+    let public_key = cosmos::Wallet::gen_public_key(xpriv);
+    let private_key_hex = hex::encode(xpriv.private_key.secret_bytes()).to_uppercase();
+    let public_key_hex = hex::encode(public_key.serialize()).to_uppercase();
+    println!("Private Key: {}", private_key_hex);
+    println!("Public Key : {}", public_key_hex);
     Ok(())
 }

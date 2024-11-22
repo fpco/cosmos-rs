@@ -4,7 +4,6 @@ mod chain;
 mod cli;
 mod config;
 mod contract;
-mod crypto;
 mod cw3;
 mod my_duration;
 mod nft;
@@ -71,9 +70,6 @@ impl Subcommand {
                 cw3::go(cosmos, inner).await?;
             }
             Subcommand::Config { opt: inner } => config::go(opt, inner)?,
-            Subcommand::Crypto { opt } => {
-                crypto::go(opt).await?;
-            }
         }
 
         Ok(())

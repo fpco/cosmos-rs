@@ -3,16 +3,19 @@ use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
+use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{ripemd160, sha256, Hash};
 use bitcoin::secp256k1::ecdsa::Signature;
-use bitcoin::secp256k1::{All, Message, Secp256k1};
+use bitcoin::secp256k1::{All, Message, PublicKey, Secp256k1, SecretKey};
+use bitcoin::NetworkKind;
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use once_cell::sync::{Lazy, OnceCell};
 use parking_lot::Mutex;
+use rand::rngs::OsRng;
 use rand::Rng;
+use rand::RngCore;
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::address::{AddressHrp, HasAddressHrp, PublicKeyMethod, RawAddress};
@@ -396,6 +399,28 @@ impl Wallet {
         )
         .await
     }
+
+    /// Generates a private key using secp256k1 elliptic curve.
+    pub fn gen_priv_key() -> Xpriv {
+        let mut rng = OsRng;
+        let mut secret_key_bytes = [0u8; 32];
+        rng.fill_bytes(&mut secret_key_bytes);
+        let private_key = SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order");
+        Xpriv {
+            private_key: private_key,
+            chain_code: [0u8; 32].into(),
+            child_number: ChildNumber::Normal { index: 0 },
+            depth: 0,
+            parent_fingerprint: [0u8; 4].into(),
+            network: NetworkKind::Main,
+        }
+    }
+
+    /// Gets the corresponding secp256k1 public key pair from the provided private key.
+    pub fn gen_public_key(xpriv: Xpriv) -> PublicKey {
+        let secp = Secp256k1::new();
+        PublicKey::from_secret_key(&secp, &xpriv.private_key)
+    }
 }
 
 fn cosmos_address_from_public_key(public_key: &[u8]) -> [u8; 20] {
@@ -544,5 +569,18 @@ mod tests {
             "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
             hex::encode(hash)
         );
+    }
+
+    #[test]
+    fn test_gen_key_pair() {
+        // Generate a new private key
+        let xpriv = Wallet::gen_priv_key();
+        // Generate the corresponding public key
+        let public_key = Wallet::gen_public_key(xpriv);
+        // Convert secret and public keys to hexadecimal
+        let private_key_hex = hex::encode(xpriv.private_key.secret_bytes()).to_uppercase();
+        let public_key_hex = hex::encode(public_key.serialize()).to_uppercase();
+        assert_eq!(private_key_hex.len(), 64);
+        assert_eq!(public_key_hex.len(), 66);
     }
 }
