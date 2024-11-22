@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmos::{proto::tendermint::crypto::public_key, AddressHrp, RawAddress, SeedPhrase};
+use cosmos::{AddressHrp, RawAddress, SeedPhrase};
 
 use crate::gen_wallet;
 
@@ -46,7 +46,7 @@ pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
         } => {
             println!("{}", orig.with_hrp(address_type));
         }
-        Subcommand::GenKeyPair {} => gen_key_pair()?
+        Subcommand::GenKeyPair {} => gen_key_pair()?,
     }
     Ok(())
 }

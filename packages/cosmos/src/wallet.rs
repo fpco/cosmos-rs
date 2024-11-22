@@ -405,9 +405,10 @@ impl Wallet {
         let mut rng = OsRng;
         let mut secret_key_bytes = [0u8; 32];
         rng.fill_bytes(&mut secret_key_bytes);
-        let private_key = SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order");
+        let private_key =
+            SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order");
         Xpriv {
-            private_key: private_key,
+            private_key,
             chain_code: [0u8; 32].into(),
             child_number: ChildNumber::Normal { index: 0 },
             depth: 0,
@@ -573,11 +574,8 @@ mod tests {
 
     #[test]
     fn test_gen_key_pair() {
-        // Generate a new private key
         let xpriv = Wallet::gen_priv_key();
-        // Generate the corresponding public key
         let public_key = Wallet::gen_public_key(xpriv);
-        // Convert secret and public keys to hexadecimal
         let private_key_hex = hex::encode(xpriv.private_key.secret_bytes()).to_uppercase();
         let public_key_hex = hex::encode(public_key.serialize()).to_uppercase();
         assert_eq!(private_key_hex.len(), 64);
