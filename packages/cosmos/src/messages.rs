@@ -199,16 +199,54 @@ impl From<MsgUpdateAdmin> for TxMessage {
 
 impl From<MsgSend> for TxMessage {
     fn from(msg: MsgSend) -> Self {
-        TxMessage::new(
-            "/cosmos.bank.v1beta1.MsgSend",
-            msg.encode_to_vec(),
-            format!(
-                "{} sending {} to {}",
+        // Very hacky approach to sending the alternative MsgSend
+        // on THORChain. For simplicity, we simply look for an appropriate
+        // HRP prefix on the destination address.
+        if msg.to_address.starts_with("sthor1") {
+            #[derive(::prost::Message)]
+            struct ThorMsgSend {
+                /// Source of funds
+                #[prost(bytes, tag = "1")]
+                from_address: Vec<u8>,
+                /// Destination of funds
+                #[prost(bytes, tag = "2")]
+                to_address: Vec<u8>,
+                /// Funds to be sent
+                #[prost(message, repeated, tag = "3")]
+                amount: ::prost::alloc::vec::Vec<cosmos_sdk_proto::cosmos::base::v1beta1::Coin>,
+            }
+            let description = format!(
+                "{} sending (via THORChain message) {} to {}",
                 msg.from_address,
                 PrettyCoins(msg.amount.as_slice()),
                 msg.to_address,
-            ),
-        )
+            );
+            fn get_acc_address(s: &str) -> Vec<u8> {
+                // This code will panic if an invalid address is provided.
+                // We could fix that, but given how corner a case this is,
+                // I'm not interested in changing the overall API to accommodate
+                // it.
+                bech32::decode(s).unwrap().1
+            }
+            let thormsg = ThorMsgSend {
+                from_address: get_acc_address(&msg.from_address),
+                to_address: get_acc_address(&msg.to_address),
+                amount: msg.amount,
+            };
+
+            TxMessage::new("/types.MsgSend", thormsg.encode_to_vec(), description)
+        } else {
+            TxMessage::new(
+                "/cosmos.bank.v1beta1.MsgSend",
+                msg.encode_to_vec(),
+                format!(
+                    "{} sending {} to {}",
+                    msg.from_address,
+                    PrettyCoins(msg.amount.as_slice()),
+                    msg.to_address,
+                ),
+            )
+        }
     }
 }
 
