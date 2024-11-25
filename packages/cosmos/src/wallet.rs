@@ -559,10 +559,7 @@ mod tests {
         let address_hrp = AddressHrp::from_static("cosmos");
         let wallet = Wallet::generate(address_hrp).unwrap();
         let private_key = wallet.get_privkey().private_key.display_secret();
-        let mut public_key = String::new();
-        for byte in wallet.public_key_bytes() {
-            public_key.push_str(&format!("{:02x}", byte));
-        }
+        let public_key = hex::encode(wallet.public_key_bytes());
         assert_eq!(private_key.to_string().len(), 64);
         assert_eq!(public_key.to_string().len(), 66);
     }
