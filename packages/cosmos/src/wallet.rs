@@ -6,7 +6,7 @@ use std::sync::Arc;
 use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{ripemd160, sha256, Hash};
 use bitcoin::secp256k1::ecdsa::Signature;
-use bitcoin::secp256k1::{All, Message, Secp256k1};
+use bitcoin::secp256k1::{All, Message, PublicKey, Secp256k1};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
@@ -400,6 +400,17 @@ impl Wallet {
         )
         .await
     }
+
+    /// Generates a private key using secp256k1 elliptic curve.
+    pub fn gen_priv_key() -> Result<Xpriv, WalletError> {
+        Ok(Wallet::generate(AddressHrp::from_static("cosmos"))?.privkey)
+    }
+
+    /// Gets the corresponding secp256k1 public key pair from the provided private key.
+    pub fn gen_public_key(xpriv: Xpriv) -> PublicKey {
+        let secp = Secp256k1::new();
+        PublicKey::from_secret_key(&secp, &xpriv.private_key)
+    }
 }
 
 fn cosmos_address_from_public_key(public_key: &[u8]) -> [u8; 20] {
@@ -552,10 +563,10 @@ mod tests {
 
     #[test]
     fn test_gen_key_pair() {
-        let address_hrp = AddressHrp::from_static("cosmos");
-        let wallet = Wallet::generate(address_hrp).unwrap();
-        let private_key_hex = hex::encode(wallet.privkey.private_key.secret_bytes()).to_uppercase();
-        let public_key_hex = hex::encode(wallet.public_key_bytes()).to_uppercase();
+        let privkey = Wallet::gen_priv_key().unwrap();
+        let public_key = Wallet::gen_public_key(privkey);
+        let private_key_hex = hex::encode(privkey.private_key.secret_bytes()).to_uppercase();
+        let public_key_hex = hex::encode(public_key.serialize()).to_uppercase();
         assert_eq!(private_key_hex.len(), 64);
         assert_eq!(public_key_hex.len(), 66);
     }
