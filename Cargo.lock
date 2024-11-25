@@ -732,7 +732,6 @@ dependencies = [
  "cw4-group",
  "fs-err",
  "futures",
- "hex",
  "once_cell",
  "quickcheck",
  "regex",
