@@ -30,8 +30,6 @@ enum Subcommand {
         /// Destination address HRP (human-readable part)
         hrp: AddressHrp,
     },
-    /// Generate a Secp256k1 Private/Public key pair
-    GenKeyPair {},
 }
 
 pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
@@ -46,20 +44,6 @@ pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
         } => {
             println!("{}", orig.with_hrp(address_type));
         }
-        Subcommand::GenKeyPair {} => gen_key_pair()?,
     }
-    Ok(())
-}
-
-fn gen_key_pair() -> Result<()> {
-    let address_hrp = AddressHrp::from_static("cosmos");
-    let wallet = cosmos::Wallet::generate(address_hrp).unwrap();
-    let private_key = wallet.get_privkey().private_key.display_secret();
-    let mut public_key = String::new();
-    for byte in wallet.public_key_bytes() {
-        public_key.push_str(&format!("{:02x}", byte));
-    }
-    println!("Private Key: {}", private_key);
-    println!("Public Key: {}", public_key);
     Ok(())
 }
