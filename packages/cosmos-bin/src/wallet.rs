@@ -52,10 +52,10 @@ pub(crate) async fn go(Opt { sub }: Opt) -> Result<()> {
 }
 
 fn gen_key_pair() -> Result<()> {
-    let xpriv = cosmos::Wallet::gen_priv_key();
-    let public_key = cosmos::Wallet::gen_public_key(xpriv);
-    let private_key_hex = hex::encode(xpriv.private_key.secret_bytes()).to_uppercase();
-    let public_key_hex = hex::encode(public_key.serialize()).to_uppercase();
+    let address_hrp = AddressHrp::from_static("cosmos");
+    let wallet = cosmos::Wallet::generate(address_hrp)?;
+    let private_key_hex = hex::encode(wallet.privkey.private_key.secret_bytes()).to_uppercase();
+    let public_key_hex = hex::encode(wallet.public_key_bytes()).to_uppercase();
     println!("Private Key: {}", private_key_hex);
     println!("Public Key : {}", public_key_hex);
     Ok(())

@@ -3,19 +3,16 @@ use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
+use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{ripemd160, sha256, Hash};
 use bitcoin::secp256k1::ecdsa::Signature;
-use bitcoin::secp256k1::{All, Message, PublicKey, Secp256k1, SecretKey};
-use bitcoin::NetworkKind;
+use bitcoin::secp256k1::{All, Message, Secp256k1};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 use once_cell::sync::{Lazy, OnceCell};
 use parking_lot::Mutex;
-use rand::rngs::OsRng;
 use rand::Rng;
-use rand::RngCore;
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::address::{AddressHrp, HasAddressHrp, PublicKeyMethod, RawAddress};
@@ -294,12 +291,16 @@ const OSMO_LOCAL_PHRASE: &str = "notice oak worry limit wrap speak medal online 
 // Not deriving Copy since this is a pretty large data structure.
 pub struct Wallet {
     address: Address,
-    privkey: Xpriv,
-    pub(crate) public_key: WalletPublicKey,
+    /// The private key associated with the wallet.
+    /// This key is used for signing transactions and should be kept secure.
+    pub privkey: Xpriv,
+    /// The public key derived from the private key.
+    /// This key can be shared publicly and is used to receive funds.
+    pub public_key: WalletPublicKey,
 }
 
 #[derive(Clone)]
-pub(crate) enum WalletPublicKey {
+pub enum WalletPublicKey {
     Cosmos([u8; 33]),
     Ethereum([u8; 65]),
 }
@@ -398,29 +399,6 @@ impl Wallet {
             },
         )
         .await
-    }
-
-    /// Generates a private key using secp256k1 elliptic curve.
-    pub fn gen_priv_key() -> Xpriv {
-        let mut rng = OsRng;
-        let mut secret_key_bytes = [0u8; 32];
-        rng.fill_bytes(&mut secret_key_bytes);
-        let private_key =
-            SecretKey::from_slice(&secret_key_bytes).expect("32 bytes, within curve order");
-        Xpriv {
-            private_key,
-            chain_code: [0u8; 32].into(),
-            child_number: ChildNumber::Normal { index: 0 },
-            depth: 0,
-            parent_fingerprint: [0u8; 4].into(),
-            network: NetworkKind::Main,
-        }
-    }
-
-    /// Gets the corresponding secp256k1 public key pair from the provided private key.
-    pub fn gen_public_key(xpriv: Xpriv) -> PublicKey {
-        let secp = Secp256k1::new();
-        PublicKey::from_secret_key(&secp, &xpriv.private_key)
     }
 }
 
