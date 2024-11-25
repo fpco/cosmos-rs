@@ -226,7 +226,9 @@ impl From<MsgSend> for TxMessage {
                 // We could fix that, but given how corner a case this is,
                 // I'm not interested in changing the overall API to accommodate
                 // it.
-                bech32::decode(s).unwrap().1
+                bech32::decode(s)
+                    .expect("Invalid THORChain address provided for MsgSend")
+                    .1
             }
             let thormsg = ThorMsgSend {
                 from_address: get_acc_address(&msg.from_address),
