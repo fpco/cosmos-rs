@@ -291,16 +291,12 @@ const OSMO_LOCAL_PHRASE: &str = "notice oak worry limit wrap speak medal online 
 // Not deriving Copy since this is a pretty large data structure.
 pub struct Wallet {
     address: Address,
-    /// The private key associated with the wallet.
-    /// This key is used for signing transactions and should be kept secure.
-    pub privkey: Xpriv,
-    /// The public key derived from the private key.
-    /// This key can be shared publicly and is used to receive funds.
-    pub public_key: WalletPublicKey,
+    privkey: Xpriv,
+    pub(crate) public_key: WalletPublicKey,
 }
 
 #[derive(Clone)]
-pub enum WalletPublicKey {
+pub(crate) enum WalletPublicKey {
     Cosmos([u8; 33]),
     Ethereum([u8; 65]),
 }
