@@ -552,10 +552,10 @@ mod tests {
 
     #[test]
     fn test_gen_key_pair() {
-        let xpriv = Wallet::gen_priv_key();
-        let public_key = Wallet::gen_public_key(xpriv);
-        let private_key_hex = hex::encode(xpriv.private_key.secret_bytes()).to_uppercase();
-        let public_key_hex = hex::encode(public_key.serialize()).to_uppercase();
+        let address_hrp = AddressHrp::from_static("cosmos");
+        let wallet = Wallet::generate(address_hrp).unwrap();
+        let private_key_hex = hex::encode(wallet.privkey.private_key.secret_bytes()).to_uppercase();
+        let public_key_hex = hex::encode(wallet.public_key_bytes()).to_uppercase();
         assert_eq!(private_key_hex.len(), 64);
         assert_eq!(public_key_hex.len(), 66);
     }
