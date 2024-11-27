@@ -396,6 +396,14 @@ impl Wallet {
         )
         .await
     }
+
+    /// Retrieves the private key associated with the wallet.
+    ///
+    /// This function returns the private key (`Xpriv`) of the wallet.
+    /// The private key is crucial for signing transactions and should be kept secure.
+    pub fn get_privkey(&self) -> Xpriv {
+        self.privkey
+    }
 }
 
 fn cosmos_address_from_public_key(public_key: &[u8]) -> [u8; 20] {
@@ -544,5 +552,15 @@ mod tests {
             "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
             hex::encode(hash)
         );
+    }
+
+    #[test]
+    fn test_gen_key_pair() {
+        let address_hrp = AddressHrp::from_static("cosmos");
+        let wallet = Wallet::generate(address_hrp).unwrap();
+        let private_key = wallet.get_privkey().private_key.display_secret();
+        let public_key = hex::encode(wallet.public_key_bytes());
+        assert_eq!(private_key.to_string().len(), 64);
+        assert_eq!(public_key.to_string().len(), 66);
     }
 }
