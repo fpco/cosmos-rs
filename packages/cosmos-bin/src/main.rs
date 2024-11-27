@@ -79,7 +79,11 @@ impl Subcommand {
 fn gen_wallet(hrp: AddressHrp) -> Result<()> {
     let phrase = cosmos::SeedPhrase::random();
     let wallet = phrase.with_hrp(hrp)?;
+    let private_key = wallet.get_privkey().private_key.display_secret();
+    let public_key = hex::encode(wallet.public_key_bytes());
     println!("Mnemonic: {}", phrase.phrase());
     println!("Address: {wallet}");
+    println!("Private Key: {}", private_key);
+    println!("Public Key : {}", public_key);
     Ok(())
 }
