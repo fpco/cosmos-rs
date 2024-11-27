@@ -7,6 +7,7 @@ mod contract;
 mod cw3;
 mod my_duration;
 mod nft;
+mod rujira;
 mod tokenfactory;
 mod wallet;
 
@@ -70,6 +71,7 @@ impl Subcommand {
                 cw3::go(cosmos, inner).await?;
             }
             Subcommand::Config { opt: inner } => config::go(opt, inner)?,
+            Subcommand::Rujira { opt: inner } => rujira::go(opt, inner).await?,
         }
 
         Ok(())

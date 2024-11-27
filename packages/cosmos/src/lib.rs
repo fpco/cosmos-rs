@@ -31,6 +31,7 @@ mod ext;
 mod gas_multiplier;
 mod injective;
 mod parsed_coin;
+mod rujira;
 mod tokenfactory;
 mod txbuilder;
 mod wallet;
