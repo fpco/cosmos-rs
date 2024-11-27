@@ -16,6 +16,7 @@ use crate::{
         Action, BuilderError, ConnectionError, LastNodeError, NodeHealthLevel, QueryErrorDetails,
         SingleNodeHealthReport,
     },
+    rujira::RujiraQueryClient,
     CosmosBuilder,
 };
 
@@ -272,6 +273,10 @@ impl Node {
             self.node_inner.channel.clone(),
         );
         client.max_decoding_message_size(self.node_inner.max_decoding_message_size)
+    }
+
+    pub(crate) fn rujira_query_client(&self) -> RujiraQueryClient<CosmosChannel> {
+        RujiraQueryClient::new(self.node_inner.channel.clone())
     }
 
     pub(crate) fn bank_query_client(

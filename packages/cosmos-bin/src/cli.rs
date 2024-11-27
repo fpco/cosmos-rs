@@ -119,4 +119,9 @@ pub(crate) enum Subcommand {
         #[clap(subcommand)]
         opt: crate::config::Opt,
     },
+    /// Rujira-specific commands
+    Rujira {
+        #[clap(subcommand)]
+        opt: crate::rujira::Subcommand,
+    },
 }

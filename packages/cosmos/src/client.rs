@@ -1,7 +1,7 @@
-mod node;
+pub(crate) mod node;
 mod node_chooser;
 mod pool;
-mod query;
+pub(crate) mod query;
 
 use std::{
     collections::HashMap,
