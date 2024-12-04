@@ -44,6 +44,9 @@ pub struct CosmosOpt {
     /// Human readable part (HRP) of wallet addresses
     #[clap(long, global = true, env = "COSMOS_HRP")]
     hrp: Option<AddressHrp>,
+    /// Query timeout in seconds
+    #[clap(long, global = true, env = "COSMOS_QUERY_TIMEOUT_SECONDS")]
+    query_timeout_seconds: Option<u32>,
 }
 
 /// Errors for working with [CosmosOpt]
@@ -83,6 +86,7 @@ impl CosmosOpt {
             config,
             #[cfg(feature = "config")]
             config_disable,
+            query_timeout_seconds,
         } = self;
 
         // Do the error checking here instead of in clap so that the field can
@@ -179,6 +183,7 @@ impl CosmosOpt {
             builder.set_gas_estimate_multiplier(gas_multiplier);
         }
         builder.set_referer_header(referer_header);
+        builder.set_query_timeout_seconds(query_timeout_seconds);
 
         Ok(builder)
     }
