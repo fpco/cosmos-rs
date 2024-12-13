@@ -448,6 +448,7 @@ pub enum Action {
     CodeInfo(u64),
     GetTransactionBody(String),
     ListTransactionsFor(Address),
+    SearchTransactionsWithEvents(Vec<String>),
     GetBlock(i64),
     GetLatestBlock,
     Simulate(TxBuilder),
@@ -504,6 +505,7 @@ impl Action {
             Action::CodeInfo(code_id) => write!(f, "get code info for code ID {code_id}"),
             Action::GetTransactionBody(txhash) => write!(f, "get transaction {txhash}"),
             Action::ListTransactionsFor(address) => write!(f, "list transactions for {address}"),
+            Action::SearchTransactionsWithEvents(events) => write!(f, "list transactions for {}", events.join(",")),
             Action::GetBlock(height) => write!(f, "get block {height}"),
             Action::GetLatestBlock => f.write_str("get latest block"),
             Action::Simulate(txbuilder) => write!(f, "simulating transaction: {txbuilder}"),
@@ -1040,7 +1042,6 @@ mod tests {
         assert_eq!(
             extract_cosmos_sdk_error_code("Error parsing into type foo::QueryMsg: unknown variant `{\"invalid_request\":{}}`, expected one of `version`, `bin`: query wasm contract failed"),
             None
-
         );
     }
 }

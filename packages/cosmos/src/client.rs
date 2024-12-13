@@ -198,9 +198,9 @@ impl Cosmos {
         };
         let mut base_account = self.get_base_account(address).await?;
         if let Some(SequenceInformation {
-            sequence,
-            timestamp,
-        }) = sequence
+                        sequence,
+                        timestamp,
+                    }) = sequence
         {
             let diff = Instant::now().duration_since(timestamp);
             if diff.as_secs() <= 30 {
@@ -279,9 +279,9 @@ impl Cosmos {
         };
         let mut base_account = self.get_base_account(address).await?;
         if let Some(SequenceInformation {
-            sequence,
-            timestamp,
-        }) = sequence
+                        sequence,
+                        timestamp,
+                    }) = sequence
         {
             let diff = Instant::now().duration_since(timestamp);
             if diff.as_secs() <= 30 {
@@ -540,7 +540,7 @@ impl Cosmos {
                             tonic::Request::new(GetLatestBlockRequest {}),
                             cosmos_inner,
                         )
-                        .await
+                            .await
                         {
                             Ok(_) => {
                                 // OK, connection looks fine, don't bother retrying
@@ -786,10 +786,10 @@ impl Cosmos {
                     .value
                     .as_ref(),
             )
-            .map_err(|source| crate::Error::InvalidChainResponse {
-                message: format!("Unable to parse eth_account: {source}"),
-                action: action.clone().into(),
-            })?;
+                .map_err(|source| crate::Error::InvalidChainResponse {
+                    message: format!("Unable to parse eth_account: {source}"),
+                    action: action.clone().into(),
+                })?;
             eth_account
                 .base_account
                 .ok_or_else(|| crate::Error::InvalidChainResponse {
@@ -806,10 +806,10 @@ impl Cosmos {
                     .value
                     .as_ref(),
             )
-            .map_err(|source| crate::Error::InvalidChainResponse {
-                message: format!("Unable to parse account: {source}"),
-                action: action.into(),
-            })?
+                .map_err(|source| crate::Error::InvalidChainResponse {
+                    message: format!("Unable to parse account: {source}"),
+                    action: action.into(),
+                })?
         };
         Ok(base_account)
     }
@@ -989,9 +989,9 @@ impl Cosmos {
                     );
                 }
                 Err(QueryError {
-                    query: QueryErrorDetails::NotFound(_),
-                    ..
-                }) => {
+                        query: QueryErrorDetails::NotFound(_),
+                        ..
+                    }) => {
                     tracing::debug!(
                         "Transaction {txhash} not ready, attempt #{attempt}/{}",
                         self.pool.builder.transaction_attempts()
@@ -1038,6 +1038,37 @@ impl Cosmos {
                     .tx_responses
                     .into_iter()
                     .map(|x| x.txhash)
+                    .collect()
+            })
+    }
+
+    /// Get a list of tx responses for transactions send by the queried events.
+    pub async fn search_transactions_by_events(
+        &self,
+        events: &Vec<String>,
+        limit: Option<u64>,
+        page: Option<u64>,
+        query: Option<String>,
+    ) -> Result<Vec<TxResponse>, QueryError> {
+        // The pagination field within this struct is
+        // deprecated. https://docs.rs/cosmos-sdk-proto/0.21.1/cosmos_sdk_proto/cosmos/tx/v1beta1/struct.GetTxsEventRequest.html#structfield.pagination
+        #[allow(deprecated)]
+        let req = GetTxsEventRequest {
+            events: events.clone(),
+            pagination: None,
+            order_by: OrderBy::Asc as i32,
+            page: page.unwrap_or(1),
+            limit: limit.unwrap_or(10),
+            query: query.unwrap_or("".into()),
+        };
+        self.perform_query(req, Action::SearchTransactionsWithEvents(events.clone()))
+            .run()
+            .await
+            .map(|x| {
+                x.into_inner()
+                    .tx_responses
+                    .into_iter()
+                    .map(|x| x)
                     .collect()
             })
     }
@@ -1108,13 +1139,13 @@ impl Cosmos {
     pub async fn get_earliest_block_info(&self) -> Result<BlockInfo, crate::Error> {
         match self.get_block_info(1).await {
             Err(crate::Error::Query(QueryError {
-                query:
-                    QueryErrorDetails::HeightNotAvailable {
-                        lowest_height: Some(lowest_height),
-                        ..
-                    },
-                ..
-            })) => self.get_block_info(lowest_height).await,
+                                        query:
+                                        QueryErrorDetails::HeightNotAvailable {
+                                            lowest_height: Some(lowest_height),
+                                            ..
+                                        },
+                                        ..
+                                    })) => self.get_block_info(lowest_height).await,
             x => x,
         }
     }
@@ -1226,7 +1257,7 @@ impl Cosmos {
     where
         BodyBytes: AsRef<[u8]>,
         AuthInfoBytes: AsRef<[u8]>,
-        Signatures: IntoIterator<Item = Signature>,
+        Signatures: IntoIterator<Item=Signature>,
         Signature: AsRef<[u8]>,
     {
         Ok(Tx {
@@ -1330,10 +1361,10 @@ impl BlockInfo {
                 chain_id,
             })
         })()
-        .map_err(|message| crate::Error::InvalidChainResponse {
-            message,
-            action: action.into(),
-        })
+            .map_err(|message| crate::Error::InvalidChainResponse {
+                message,
+                action: action.into(),
+            })
     }
 }
 
@@ -1479,7 +1510,7 @@ impl TxBuilder {
             self.make_tx_body(),
             gas_to_request,
         )
-        .await
+            .await
     }
 
     async fn inner_sign_and_broadcast_cosmos(
@@ -1500,7 +1531,7 @@ impl TxBuilder {
             body.clone(),
             gas_to_request,
         )
-        .await
+            .await
     }
 
     fn make_signer_info(&self, sequence: u64, wallet: Option<&Wallet>) -> SignerInfo {
@@ -1514,7 +1545,7 @@ impl TxBuilder {
                             cosmos_sdk_proto::tendermint::crypto::public_key::Sum::Ed25519(vec![]),
                         ),
                     }
-                    .encode_to_vec(),
+                        .encode_to_vec(),
                 }),
                 Some(wallet) => {
                     match wallet.public_key {
@@ -1528,7 +1559,7 @@ impl TxBuilder {
                                     ),
                                 ),
                             }
-                            .encode_to_vec(),
+                                .encode_to_vec(),
                         }),
                         // Use the Injective method of public key
                         WalletPublicKey::Ethereum(public_key) => Some(cosmos_sdk_proto::Any {
@@ -1540,7 +1571,7 @@ impl TxBuilder {
                                     ),
                                 ),
                             }
-                            .encode_to_vec(),
+                                .encode_to_vec(),
                         }),
                     }
                 }
@@ -1649,7 +1680,7 @@ impl TxBuilder {
             body,
             gas_to_request,
         )
-        .await
+            .await
     }
 
     async fn sign_and_broadcast_with_inner(
@@ -1789,13 +1820,13 @@ impl TxBuilder {
                 .to_string();
             match retry_with_price(amount).await {
                 Err(crate::Error::TransactionFailed {
-                    code: CosmosSdkError::InsufficientFee,
-                    txhash,
-                    raw_log,
-                    action: _,
-                    grpc_url: _,
-                    stage: _,
-                }) => {
+                        code: CosmosSdkError::InsufficientFee,
+                        txhash,
+                        raw_log,
+                        action: _,
+                        grpc_url: _,
+                        stage: _,
+                    }) => {
                     tracing::debug!(
                         "Insufficient gas in attempt #{}, retrying {txhash}. Raw log: {raw_log}",
                         attempt_number + 1
