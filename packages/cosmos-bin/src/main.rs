@@ -44,12 +44,9 @@ impl Subcommand {
                     &mut std::io::stdout(),
                 );
             }
-            Subcommand::Nft {
-                opt: inner,
-                subcommand,
-            } => {
+            Subcommand::Nft { subcommand } => {
                 let cosmos = opt.network_opt.build().await?;
-                nft::go(subcommand, inner, cosmos).await?;
+                nft::go(subcommand, cosmos).await?;
             }
             Subcommand::Contract { opt: inner } => {
                 let cosmos = opt.network_opt.build().await?;
