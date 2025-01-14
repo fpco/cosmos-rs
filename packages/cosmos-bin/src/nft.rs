@@ -231,6 +231,7 @@ async fn owners_csv(
         .await?;
     }
     std::mem::drop(results);
+    std::mem::drop(tx);
 
     while let Some(res) = set.join_next().await {
         match res {
