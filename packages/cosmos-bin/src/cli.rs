@@ -79,8 +79,6 @@ pub(crate) enum Subcommand {
     },
     /// NFT focused subcommands
     Nft {
-        #[clap(flatten)]
-        opt: nft::Opt,
         #[clap(subcommand)]
         subcommand: nft::Subcommand,
     },
