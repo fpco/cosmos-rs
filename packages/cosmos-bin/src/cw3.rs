@@ -530,7 +530,7 @@ async fn send_coins_message(
             tracing::info!("Simulation was successful");
             tracing::debug!("{:?}", res);
         }
-        Err(e) => tracing::error!("Unable to simulate transaction: {e:?}"),
+        Err(e) => tracing::error!("Unable to simulate transaction: {e}"),
     }
     Ok(())
 }
