@@ -459,21 +459,9 @@ impl Cosmos {
         std::mem::drop(tx_error);
 
         // Now we wait for either a success or error to come back.
-        let res = tokio::select! {
-            success = rx_success.recv() => match success {
-                Some(success) => Ok(success),
-                None => {
-                    // No successes, but let's see if we can get a more accurate error
-                    Err(rx_error.recv().await)
-                },
-            },
-            error = rx_error.recv() => {
-                // We got an error, let's see if we also got a success
-                match rx_success.recv().await {
-                    Some(success) => Ok(success),
-                    None => Err(error),
-                }
-            }
+        let res = match rx_success.recv().await {
+            Some(success) => Ok(success),
+            None => Err(rx_error.recv().await),
         };
 
         // Now that we have our results, stop running the other
