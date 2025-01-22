@@ -30,7 +30,7 @@ use cosmos_sdk_proto::{
     traits::Message,
 };
 use parking_lot::{Mutex, RwLock};
-use tokio::{task::JoinSet, time::Instant};
+use tokio::{sync::mpsc::Receiver, task::JoinSet, time::Instant};
 use tonic::{service::Interceptor, Status};
 
 use crate::{
@@ -160,9 +160,86 @@ pub(crate) struct PerformQueryBuilder<'a, Request> {
     all_nodes: bool,
 }
 
-impl<Request: GrpcRequest> PerformQueryBuilder<'_, Request> {
+struct PerformQueryError {
+    details: QueryErrorDetails,
+    grpc_url: Arc<String>,
+}
+
+struct PerformQueryResponse<'a, Request: GrpcRequest> {
+    cosmos: &'a Cosmos,
+    rx: Receiver<Result<PerformQueryWrapper<Request::Response>, PerformQueryError>>,
+    set: JoinSet<()>,
+    is_all_nodes: bool,
+    action: Action,
+}
+
+impl<Request: GrpcRequest> Drop for PerformQueryResponse<'_, Request> {
+    fn drop(&mut self) {
+        // If we were doing an all-nodes broadcast, let remaining tasks
+        // complete in case the successful broadcast went to a node
+        // where the transactions aren't being shared to other mempools
+        // correctly.
+        if !self.is_all_nodes {
+            self.set.abort_all();
+        }
+    }
+}
+
+impl<Request: GrpcRequest> PerformQueryResponse<'_, Request> {
+    fn make_error(&self, query: QueryErrorDetails, grpc_url: Arc<String>) -> QueryError {
+        QueryError {
+            action: self.action.clone(),
+            builder: self.cosmos.pool.builder.clone(),
+            height: self.cosmos.height,
+            query,
+            grpc_url,
+            node_health: self.cosmos.pool.node_chooser.health_report(),
+        }
+    }
+}
+
+impl<'a, Request: GrpcRequest> PerformQueryBuilder<'a, Request> {
+    async fn run_with<T, E, Mapper>(self, mapper: Mapper) -> Result<T, E>
+    where
+        Mapper: Fn(
+            &PerformQueryResponse<Request>,
+            Result<PerformQueryWrapper<Request::Response>, QueryError>,
+        ) -> Result<T, E>,
+        E: From<QueryError> + std::fmt::Display,
+    {
+        let mut first_error = None;
+        let mut pqr = run_query(self).await?;
+        loop {
+            let err = match pqr.rx.recv().await {
+                None => break,
+                Some(res) => {
+                    let res = res.map_err(|PerformQueryError { details, grpc_url }| {
+                        pqr.make_error(details, grpc_url)
+                    });
+                    match mapper(&pqr, res) {
+                        Ok(success) => return Ok(success),
+                        Err(err) => err,
+                    }
+                }
+            };
+            if first_error.is_some() {
+                tracing::warn!("Extra error while looking for success response from nodes: {err}");
+            } else {
+                first_error = Some(err);
+            }
+        }
+
+        Err(first_error.unwrap_or_else(|| {
+            pqr.make_error(
+                QueryErrorDetails::ConnectionError(ConnectionError::NoHealthyFound),
+                pqr.cosmos.get_cosmos_builder().grpc_url_arc().clone(),
+            )
+            .into()
+        }))
+    }
+
     pub(crate) async fn run(self) -> Result<PerformQueryWrapper<Request::Response>, QueryError> {
-        Cosmos::run_query(self).await
+        self.run_with(|_pqr, res| res).await
     }
 
     pub(crate) fn no_retry(mut self) -> Self {
@@ -173,6 +250,52 @@ impl<Request: GrpcRequest> PerformQueryBuilder<'_, Request> {
     fn all_nodes(mut self) -> Self {
         self.all_nodes = true;
         self
+    }
+}
+
+impl PerformQueryBuilder<'_, BroadcastTxRequest> {
+    async fn run_broadcast(
+        self,
+        skip_code_check: bool,
+    ) -> Result<(Arc<String>, TxResponse), crate::Error> {
+        self.run_with(|pqr, res| {
+            let res = res?;
+            let grpc_url = res.grpc_url;
+            let res = res.tonic.into_inner().tx_response.ok_or_else(|| {
+                crate::Error::InvalidChainResponse {
+                    message: "Missing inner tx_response".to_owned(),
+                    action: pqr.action.clone().into(),
+                }
+            })?;
+
+            // Check if the transaction was successfully broadcast. We have three
+            // ways for this to "succeed":
+            //
+            // 1. We've decided to skip checking the code entirely.
+            // 2. The broadcast succeeded (status 0)
+            // 3. The broadcast failed with code 19, meaning "already in mempool"
+            //
+            // Our assumption with (3) is that we don't care about reporting if
+            // the tx is already in the pool, we just want to wait for it to be
+            // included in a block. Note that it's common for code 19 to occur
+            // when using all-node broadcasting.
+            if !(skip_code_check
+                || res.code == 0
+                || CosmosSdkError::from_code(res.code, &res.codespace).is_successful_broadcast())
+            {
+                Err(crate::Error::TransactionFailed {
+                    code: CosmosSdkError::from_code(res.code, &res.codespace),
+                    txhash: res.txhash.clone(),
+                    raw_log: res.raw_log,
+                    action: pqr.action.clone().into(),
+                    grpc_url,
+                    stage: crate::error::TransactionStage::Broadcast,
+                })
+            } else {
+                Ok((grpc_url, res))
+            }
+        })
+        .await
     }
 }
 
@@ -328,91 +451,91 @@ impl Cosmos {
             all_nodes: false,
         }
     }
+}
 
-    async fn run_query<Request: GrpcRequest>(
-        PerformQueryBuilder {
-            cosmos,
-            req,
-            action,
-            should_retry,
-            all_nodes,
-        }: PerformQueryBuilder<'_, Request>,
-    ) -> Result<PerformQueryWrapper<Request::Response>, QueryError> {
-        // This function is responsible for running queries against blockchain nodes.
-        // There are two primary ways of operating:
-        //
-        // All nodes: this is used when broadcasting transactions. The idea is that we
-        // want to broadcast to _all_ non-blocked nodes, since sometimes some nodes are
-        // unable to rebroadcast transactions from their mempool over P2P. In this case,
-        // we want to broadcast to all nodes immediately, return from this function as
-        // soon as the first success comes through, and let broadcasts to other nodes
-        // continue in the background.
-        //
-        // Regular: for everything else, we don't want to spam all nodes with every
-        // request. Instead, we get a priority list of the healthiest nodes and try them
-        // in order. We delay each successive node by a configurable amount of time to
-        // allow the earlier nodes to complete. We want to return from this function as
-        // soon as the first success comes through, but we want to cancel all remaining
-        // work at that point.
-        //
-        // Regardless, we track all of our tasks in a JoinSet.
-        let mut set = JoinSet::new();
+async fn run_query<Request: GrpcRequest>(
+    PerformQueryBuilder {
+        cosmos,
+        req,
+        action,
+        should_retry,
+        all_nodes,
+    }: PerformQueryBuilder<'_, Request>,
+) -> Result<PerformQueryResponse<'_, Request>, QueryError> {
+    // This function is responsible for running queries against blockchain nodes.
+    // There are two primary ways of operating:
+    //
+    // All nodes: this is used when broadcasting transactions. The idea is that we
+    // want to broadcast to _all_ non-blocked nodes, since sometimes some nodes are
+    // unable to rebroadcast transactions from their mempool over P2P. In this case,
+    // we want to broadcast to all nodes immediately, return from this function as
+    // soon as the first success comes through, and let broadcasts to other nodes
+    // continue in the background.
+    //
+    // Regular: for everything else, we don't want to spam all nodes with every
+    // request. Instead, we get a priority list of the healthiest nodes and try them
+    // in order. We delay each successive node by a configurable amount of time to
+    // allow the earlier nodes to complete. We want to return from this function as
+    // soon as the first success comes through, but we want to cancel all remaining
+    // work at that point.
 
-        // Set up channels for the individual workers to send back either success or
-        // error results. We keep separate channels, since we may want to optimistically
-        // exit on an early success, but likely want to wait for all nodes on failure.
-        let (tx_success, mut rx_success) = tokio::sync::mpsc::channel(1);
-        let (tx_error, mut rx_error) = tokio::sync::mpsc::channel(1);
+    // Set up channels for the individual workers to send back either success or
+    // error results. We keep separate channels, since we may want to optimistically
+    // exit on an early success, but likely want to wait for all nodes on failure.
 
-        // Grab some config values.
-        let all_nodes_broadcast =
-            all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast();
-        let delay = cosmos.get_cosmos_builder().get_delay_before_fallback();
-        let total_attempts = cosmos.pool.builder.query_retries();
+    // Grab some config values.
+    let all_nodes_broadcast = all_nodes && cosmos.get_cosmos_builder().get_all_nodes_broadcast();
+    let delay = cosmos.get_cosmos_builder().get_delay_before_fallback();
+    let total_attempts = cosmos.pool.builder.query_retries();
 
-        // Get the set of nodes we should run against.
-        let nodes = if all_nodes_broadcast {
-            cosmos
-                .pool
-                .all_nodes()
-                .filter(|node| match node.node_health_level() {
-                    crate::error::NodeHealthLevel::Unblocked { error_count: _ } => true,
-                    crate::error::NodeHealthLevel::Blocked => false,
-                })
-                .cloned()
-                .collect()
-        } else {
-            cosmos.pool.node_chooser.choose_nodes()
-        };
+    // Get the set of nodes we should run against.
+    let nodes = if all_nodes_broadcast {
+        cosmos
+            .pool
+            .all_nodes()
+            .filter(|node| match node.node_health_level() {
+                crate::error::NodeHealthLevel::Unblocked { error_count: _ } => true,
+                crate::error::NodeHealthLevel::Blocked => false,
+            })
+            .cloned()
+            .collect()
+    } else {
+        cosmos.pool.node_chooser.choose_nodes()
+    };
 
-        if cosmos.pool.builder.get_log_requests() {
-            tracing::info!("{action}");
-        }
+    if cosmos.pool.builder.get_log_requests() {
+        tracing::info!("{action}");
+    }
 
-        for node in nodes {
-            // Cloning for passing into the async move
-            let tx_success = tx_success.clone();
-            let tx_error = tx_error.clone();
-            let action = action.clone();
-            let req = req.clone();
-            let cosmos = cosmos.clone();
-            let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-            set.spawn(async move {
+    // Prepare for parallel execution
+    let mut set = JoinSet::new();
+    let (tx, rx) = tokio::sync::mpsc::channel(nodes.len());
+
+    for (node_idx, node) in nodes.into_iter().enumerate() {
+        // Cloning for passing into the async move
+        let tx = tx.clone();
+        let action = action.clone();
+        let req = req.clone();
+        let cosmos = cosmos.clone();
+        set.spawn(async move {
+            if node_idx != 0 {
+                tokio::time::sleep(delay).await;
+            }
                 for attempt in 1..=total_attempts {
                     let _permit = cosmos.pool.get_node_permit().await;
                     match cosmos.perform_query_inner(req.clone(), &node).await {
                         Ok(tonic) => {
                             node.log_query_result(QueryResult::Success);
-                            tx_success
-                                .try_send(PerformQueryWrapper {
+                            tx
+                                .try_send(Ok(PerformQueryWrapper {
                                     grpc_url: node.grpc_url().clone(),
                                     tonic,
-                                })
+                                }))
                                 .ok();
                             break;
                         }
                         Err((err, can_retry)) => {
-                            tracing::debug!("Error performing a query. Attempt {attempt} of {total_attempts}. can_retry={can_retry}. should_retry={should_retry}. {err:?}");
+                            tracing::debug!("Error performing a query. Attempt {attempt} of {total_attempts}. can_retry={can_retry}. should_retry={should_retry}. {err}");
                             node.log_query_result(if can_retry {
                                 QueryResult::NetworkError {
                                     err: err.clone(),
@@ -421,85 +544,26 @@ impl Cosmos {
                             } else {
                                 QueryResult::OtherError
                             });
-                            tx_error.try_send((err, node.grpc_url().clone())).ok();
+                            tx.try_send(Err(PerformQueryError { details: err, grpc_url: node.grpc_url().clone() })).ok();
                             if !can_retry || !should_retry {
                                 break;
                             }
                         }
                     }
                 }
-                tx_complete.send(()).ok();
             });
-
-            // If we're not doing an all-nodes broadcast, then check we wait-and-check.
-            // The waiting is handled by the sleep call. If a successful response
-            // comes in while timeout-ing, then we'll get that result and return it.
-            if !all_nodes_broadcast {
-                tokio::select! {
-                    // Timeout occurred, keep going
-                    _ = tokio::time::sleep(delay) => (),
-                    // Child task finished, also keep going, don't wait for the timeout
-                    _ = rx_complete => (),
-                    // We got a success, let's use it!
-                    success = rx_success.recv() => match success {
-                    // rx_success yielded a value, stop doing other work and return the success
-                        Some(success) => {
-                            set.abort_all();
-                            return Ok(success);
-                        }
-                        // All send channels are closed, which should never happen at this point
-                        None => unreachable!(),
-                    }
-                }
-            }
-        }
-
-        // Drop the remaining send side of channels to avoid deadlocks while waiting below.
-        std::mem::drop(tx_success);
-        std::mem::drop(tx_error);
-
-        // Now we wait for either a success or error to come back.
-        let res = tokio::select! {
-            success = rx_success.recv() => match success {
-                Some(success) => Ok(success),
-                None => {
-                    // No successes, but let's see if we can get a more accurate error
-                    Err(rx_error.recv().await)
-                },
-            },
-            error = rx_error.recv() => {
-                // We got an error, let's see if we also got a success
-                match rx_success.recv().await {
-                    Some(success) => Ok(success),
-                    None => Err(error),
-                }
-            }
-        };
-
-        // Now that we have our results, stop running the other
-        // tasks, unless we're doing an all-nodes broadcast.
-        if !all_nodes_broadcast {
-            set.abort_all();
-        }
-        res.map_err(|first_error| {
-            let (err, grpc_url) = match first_error {
-                Some(pair) => pair,
-                None => (
-                    QueryErrorDetails::ConnectionError(ConnectionError::NoHealthyFound),
-                    cosmos.get_cosmos_builder().grpc_url_arc().clone(),
-                ),
-            };
-            QueryError {
-                action,
-                builder: cosmos.pool.builder.clone(),
-                height: cosmos.height,
-                query: err,
-                grpc_url,
-                node_health: cosmos.pool.node_chooser.health_report(),
-            }
-        })
     }
 
+    Ok(PerformQueryResponse {
+        cosmos,
+        rx,
+        set,
+        is_all_nodes: all_nodes_broadcast,
+        action,
+    })
+}
+
+impl Cosmos {
     /// Error return: the details itself, and whether a retry can be attempted.
     async fn perform_query_inner<Request: GrpcRequest>(
         &self,
@@ -1711,7 +1775,7 @@ impl TxBuilder {
                 fee: amount.clone(),
             };
 
-            let PerformQueryWrapper { grpc_url, tonic } = cosmos
+            let (grpc_url, res) = cosmos
                 .perform_query(
                     BroadcastTxRequest {
                         tx_bytes: tx.encode_to_vec(),
@@ -1720,41 +1784,8 @@ impl TxBuilder {
                     mk_action(),
                 )
                 .all_nodes()
-                .run()
+                .run_broadcast(self.skip_code_check)
                 .await?;
-            let res = tonic.into_inner().tx_response.ok_or_else(|| {
-                crate::Error::InvalidChainResponse {
-                    message: "Missing inner tx_response".to_owned(),
-                    action: mk_action().into(),
-                }
-            })?;
-
-            // Check if the transaction was successfully broadcast. We have three
-            // ways for this to "succeed":
-            //
-            // 1. We've decided to skip checking the code entirely.
-            // 2. The broadcast succeeded (status 0)
-            // 3. The broadcast failed with code 19, meaning "already in mempool"
-            //
-            // Our assumption with (3) is that we don't care about reporting if
-            // the tx is already in the pool, we just want to wait for it to be
-            // included in a block. Note that it's common for code 19 to occur
-            // when using all-node broadcasting.
-            if !(self.skip_code_check
-                || res.code == 0
-                || CosmosSdkError::from_code(res.code, &res.codespace).is_successful_broadcast())
-            {
-                return Err(crate::Error::TransactionFailed {
-                    code: CosmosSdkError::from_code(res.code, &res.codespace),
-                    txhash: res.txhash.clone(),
-                    raw_log: res.raw_log,
-                    action: mk_action().into(),
-                    grpc_url,
-                    stage: crate::error::TransactionStage::Broadcast,
-                });
-            };
-
-            tracing::debug!("Initial BroadcastTxResponse: {res:?}");
 
             let action = Action::WaitForBroadcast {
                 txbuilder: self.clone(),
