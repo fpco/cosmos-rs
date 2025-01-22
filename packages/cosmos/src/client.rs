@@ -989,7 +989,9 @@ impl Cosmos {
                     );
                 }
                 Err(QueryError {
-                    query: QueryErrorDetails::NotFound(_),
+                    // Some nodes will hang on these queries, so treat
+                    // QueryTimeout the same as NotFound.
+                    query: QueryErrorDetails::NotFound(_) | QueryErrorDetails::QueryTimeout(_),
                     ..
                 }) => {
                     tracing::debug!(
