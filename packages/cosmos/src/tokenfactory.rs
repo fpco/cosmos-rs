@@ -27,6 +27,7 @@ impl TryFrom<AddressHrp> for TokenFactoryKind {
     fn try_from(hrp: AddressHrp) -> Result<Self, TokenFactoryError> {
         match hrp.as_str() {
             "osmo" => Ok(TokenFactoryKind::Osmosis),
+            "neutron" => Ok(TokenFactoryKind::Osmosis),
             "sei" => Ok(TokenFactoryKind::Sei),
             _ => Err(TokenFactoryError::Unsupported { hrp }),
         }
