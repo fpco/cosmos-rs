@@ -1139,7 +1139,7 @@ impl Cosmos {
         .run()
         .await
         .map(|x| {
-            panic!("{:#?}", x.into_inner());
+            // FIXME turn into a more full response
             x.into_inner()
                 .tx_responses
                 .into_iter()

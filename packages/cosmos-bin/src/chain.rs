@@ -239,7 +239,9 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
                     },
                 )
                 .await?
-            {}
+            {
+                println!("{tx}");
+            }
         }
         Subcommand::ShowBlock { height } => {
             let cosmos = opt.network_opt.build().await?;
