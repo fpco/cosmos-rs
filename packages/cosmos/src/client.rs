@@ -1108,6 +1108,46 @@ impl Cosmos {
             })
     }
 
+    /// Get transactions meeting the given query.
+    pub async fn query_transactions(
+        &self,
+        query: String,
+        limit: Option<u64>,
+        page: Option<u64>,
+        order_by: OrderBy,
+    ) -> Result<Vec<String>, QueryError> {
+        // The pagination field within this struct is
+        // deprecated. https://docs.rs/cosmos-sdk-proto/0.21.1/cosmos_sdk_proto/cosmos/tx/v1beta1/struct.GetTxsEventRequest.html#structfield.pagination
+        #[allow(deprecated)]
+        let req = GetTxsEventRequest {
+            events: vec![],
+            pagination: None,
+            order_by: order_by as i32,
+            page: page.unwrap_or(1),
+            limit: limit.unwrap_or(10),
+            query: query.clone(),
+        };
+        self.perform_query(
+            req,
+            Action::QueryTransactions {
+                query,
+                limit,
+                page,
+                order_by,
+            },
+        )
+        .run()
+        .await
+        .map(|x| {
+            panic!("{:#?}", x.into_inner());
+            x.into_inner()
+                .tx_responses
+                .into_iter()
+                .map(|x| x.txhash)
+                .collect()
+        })
+    }
+
     /// attempt_number starts at 0
     async fn gas_to_coins(&self, gas: u64, attempt_number: u64) -> u64 {
         let CurrentGasPrice { low, high, base: _ } = self.current_gas_price().await;

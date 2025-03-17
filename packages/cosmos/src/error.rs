@@ -6,6 +6,7 @@ use std::{fmt::Display, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 use bip39::Mnemonic;
 use bitcoin::bip32::DerivationPath;
 use chrono::{DateTime, Utc};
+use cosmos_sdk_proto::cosmos::tx::v1beta1::OrderBy;
 use http::uri::InvalidUri;
 
 use crate::{Address, AddressHrp, CosmosBuilder, TxBuilder};
@@ -487,6 +488,12 @@ pub enum Action {
         txhash: String,
     },
     BroadcastRaw,
+    QueryTransactions {
+        query: String,
+        limit: Option<u64>,
+        page: Option<u64>,
+        order_by: OrderBy,
+    },
 }
 
 impl Display for Action {
@@ -566,6 +573,7 @@ impl Action {
                     write!(f, "waiting for transaction {txhash} to land: {txbuilder}")
                 }
             }
+            Action::QueryTransactions { query, limit, page, order_by } => write!(f, "querying transactions for {query:?}, limit={limit:?}, page={page:?}, order={order_by:?}"),
         }
     }
 }

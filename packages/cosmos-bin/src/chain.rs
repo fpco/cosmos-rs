@@ -6,7 +6,7 @@ use cosmos::{
     proto::{
         cosmos::{
             base::abci::v1beta1::TxResponse,
-            tx::v1beta1::{AuthInfo, Tx},
+            tx::v1beta1::{AuthInfo, OrderBy, Tx},
         },
         traits::Message,
     },
@@ -74,9 +74,22 @@ pub(crate) enum Subcommand {
         /// Maximum number of transactions to return
         #[clap(long)]
         limit: Option<u64>,
-        /// Offset
+        /// Page
         #[clap(long)]
-        offset: Option<u64>,
+        page: Option<u64>,
+    },
+    /// Perform a query for transactions
+    QueryTxs {
+        query: String,
+        /// Maximum number of transactions to return
+        #[clap(long)]
+        limit: Option<u64>,
+        /// Page
+        #[clap(long)]
+        page: Option<u64>,
+        /// Should we query in descending order?
+        #[clap(long)]
+        descending: bool,
     },
     /// Show block metadata and transaction hashes within the block
     ShowBlock {
@@ -200,12 +213,33 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
         Subcommand::ListTxsFor {
             address,
             limit,
-            offset,
+            page,
         } => {
             let cosmos = opt.network_opt.build().await?;
-            for txhash in cosmos.list_transactions_for(address, limit, offset).await? {
+            for txhash in cosmos.list_transactions_for(address, limit, page).await? {
                 println!("{txhash}");
             }
+        }
+        Subcommand::QueryTxs {
+            query,
+            limit,
+            page,
+            descending,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            for tx in cosmos
+                .query_transactions(
+                    query,
+                    limit,
+                    page,
+                    if descending {
+                        OrderBy::Desc
+                    } else {
+                        OrderBy::Asc
+                    },
+                )
+                .await?
+            {}
         }
         Subcommand::ShowBlock { height } => {
             let cosmos = opt.network_opt.build().await?;
