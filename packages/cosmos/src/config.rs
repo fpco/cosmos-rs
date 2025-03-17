@@ -33,6 +33,7 @@ struct NetworkConfig {
     hrp: Option<AddressHrp>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     grpc_fallbacks: Vec<String>,
+    gas_multiplier: Option<f64>,
 }
 
 impl NetworkConfig {
@@ -53,6 +54,9 @@ impl NetworkConfig {
     fn apply_extra_config(&self, builder: &mut CosmosBuilder) {
         for fallback in &self.grpc_fallbacks {
             builder.add_grpc_fallback_url(fallback);
+        }
+        if let Some(gas_multiplier) = self.gas_multiplier {
+            builder.set_gas_estimate_multiplier(gas_multiplier)
         }
     }
 }
@@ -198,6 +202,7 @@ impl CosmosConfig {
                 gas_coin,
                 hrp,
                 grpc_fallbacks,
+                gas_multiplier,
             },
         ) in networks
         {
@@ -217,6 +222,9 @@ impl CosmosConfig {
             }
             if let Some(hrp) = hrp {
                 println!("Address prefix (HRP): {hrp}");
+            }
+            if let Some(gas_multiplier) = gas_multiplier {
+                println!("Gas multiplier: {gas_multiplier}");
             }
         }
     }
@@ -238,6 +246,7 @@ impl CosmosConfig {
                 gas_coin: Some(gas_coin),
                 hrp: Some(hrp),
                 grpc_fallbacks: vec![],
+                gas_multiplier: None,
             },
         );
     }
