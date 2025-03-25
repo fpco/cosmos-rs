@@ -75,7 +75,7 @@ impl<'de> serde::Deserialize<'de> for RawAddress {
 
 struct RawAddressVisitor;
 
-impl<'de> Visitor<'de> for RawAddressVisitor {
+impl Visitor<'_> for RawAddressVisitor {
     type Value = RawAddress;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -246,7 +246,7 @@ impl<'de> serde::Deserialize<'de> for AddressHrp {
 
 struct AddressHrpVisitor;
 
-impl<'de> Visitor<'de> for AddressHrpVisitor {
+impl Visitor<'_> for AddressHrpVisitor {
     type Value = AddressHrp;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -466,7 +466,7 @@ impl<'de> serde::Deserialize<'de> for Address {
 
 struct AddressVisitor;
 
-impl<'de> Visitor<'de> for AddressVisitor {
+impl Visitor<'_> for AddressVisitor {
     type Value = Address;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

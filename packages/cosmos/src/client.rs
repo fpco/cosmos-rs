@@ -198,7 +198,7 @@ impl<Request: GrpcRequest> PerformQueryResponse<'_, Request> {
     }
 }
 
-impl<'a, Request: GrpcRequest> PerformQueryBuilder<'a, Request> {
+impl<Request: GrpcRequest> PerformQueryBuilder<'_, Request> {
     async fn run_with<T, E, Mapper>(self, mapper: Mapper) -> Result<T, E>
     where
         Mapper: Fn(

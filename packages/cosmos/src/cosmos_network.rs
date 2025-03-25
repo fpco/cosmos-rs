@@ -321,7 +321,7 @@ impl<'de> serde::Deserialize<'de> for CosmosNetwork {
 
 struct CosmosNetworkVisitor;
 
-impl<'de> Visitor<'de> for CosmosNetworkVisitor {
+impl Visitor<'_> for CosmosNetworkVisitor {
     type Value = CosmosNetwork;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
