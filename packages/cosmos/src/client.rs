@@ -702,7 +702,7 @@ impl Cosmos {
         }
 
         // Check if we're too many blocks lagging.
-        if old_height - new_height > self.get_cosmos_builder().block_lag_allowed().into() {
+        if old_height - new_height > i64::from(self.get_cosmos_builder().block_lag_allowed()) {
             return Err((
                 QueryErrorDetails::BlocksLagDetected {
                     old_height,
