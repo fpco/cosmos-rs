@@ -14,7 +14,6 @@ use crate::{error::BuilderError, gas_price::GasPriceMethod, Cosmos, CosmosBuilde
 /// Generally you'll want to use either [CosmosNetwork::builder] or [CosmosNetwork::connect].
 #[derive(
     Clone,
-    Copy,
     Debug,
     Hash,
     PartialEq,
@@ -43,6 +42,36 @@ pub enum CosmosNetwork {
     InjectiveMainnet,
     NeutronMainnet,
     NeutronTestnet,
+    /// Custom network configuration for non predefined networks.
+    ///
+    /// This allows users to specify arbitrary network information for a Cosmos network.
+    CustomNetwork(CosmosNetworkInfo),
+}
+
+/// Configuration information for a custom Cosmos network.
+#[derive(
+    Clone,
+    Debug,
+    Eq,
+    Ord,
+    PartialOrd,
+    PartialEq,
+    Hash,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct CosmosNetworkInfo {
+    /// The chain ID of the network
+    pub chain_id: String,
+    /// The gRPC endpoint URL
+    pub grpc_url: String,
+    /// The denomination used for gas fees
+    pub gas_coin: String,
+    /// Whether this network is a mainnet
+    pub is_mainnet: bool,
+    /// HRP value of the network
+    pub hrp: String,
 }
 
 impl CosmosNetwork {
@@ -64,6 +93,7 @@ impl CosmosNetwork {
             | CosmosNetwork::StargazeMainnet
             | CosmosNetwork::InjectiveMainnet
             | CosmosNetwork::NeutronMainnet => true,
+            CosmosNetwork::CustomNetwork(info) => info.is_mainnet,
         }
     }
 
@@ -92,7 +122,7 @@ impl CosmosNetwork {
     }
 
     /// Construct a [CosmosBuilder] without loading settings from the internet.
-    pub fn builder_local(self) -> CosmosBuilder {
+    pub fn builder_local(&self) -> CosmosBuilder {
         let mut builder = CosmosBuilder::new(
             self.chain_id(),
             self.gas_coin(),
@@ -104,8 +134,8 @@ impl CosmosNetwork {
     }
 
     /// Chain ID for the network
-    pub fn chain_id(self) -> &'static str {
-        match self {
+    pub fn chain_id(&self) -> String {
+        let id = match self {
             CosmosNetwork::JunoTestnet => "uni-6",
             CosmosNetwork::JunoMainnet => "juno-1",
             CosmosNetwork::JunoLocal => "testing",
@@ -121,12 +151,15 @@ impl CosmosNetwork {
             CosmosNetwork::InjectiveMainnet => "injective-1",
             CosmosNetwork::NeutronMainnet => "neutron-1",
             CosmosNetwork::NeutronTestnet => "pion-1",
-        }
+            CosmosNetwork::CustomNetwork(info) => &info.chain_id,
+        };
+
+        id.to_string()
     }
 
     /// Gas coin for the network
-    pub fn gas_coin(self) -> &'static str {
-        match self {
+    pub fn gas_coin(&self) -> String {
+        let coin = match self {
             CosmosNetwork::JunoTestnet | CosmosNetwork::JunoLocal => "ujunox",
             CosmosNetwork::JunoMainnet => "ujuno",
             CosmosNetwork::OsmosisMainnet
@@ -137,12 +170,15 @@ impl CosmosNetwork {
             CosmosNetwork::StargazeTestnet | CosmosNetwork::StargazeMainnet => "ustars",
             CosmosNetwork::InjectiveTestnet | CosmosNetwork::InjectiveMainnet => "inj",
             CosmosNetwork::NeutronMainnet | CosmosNetwork::NeutronTestnet => "untrn",
-        }
+            CosmosNetwork::CustomNetwork(info) => &info.gas_coin,
+        };
+
+        coin.to_string()
     }
 
     /// Default gRPC URL for the network
-    pub fn grpc_url(self) -> &'static str {
-        match self {
+    pub fn grpc_url(&self) -> String {
+        let url = match self {
             CosmosNetwork::JunoTestnet => "http://juno-testnet-grpc.polkachu.com:12690",
             // Found at: https://cosmos.directory/juno/nodes
             CosmosNetwork::JunoMainnet => "http://juno-grpc.polkachu.com:12690",
@@ -167,11 +203,14 @@ impl CosmosNetwork {
             CosmosNetwork::InjectiveMainnet => "https://sentry.chain.grpc.injective.network",
             CosmosNetwork::NeutronMainnet => "http://grpc-kralum.neutron-1.neutron.org",
             CosmosNetwork::NeutronTestnet => "http://grpc-falcron.pion-1.ntrn.tech",
-        }
+            CosmosNetwork::CustomNetwork(info) => &info.grpc_url,
+        };
+
+        url.to_string()
     }
 
     /// Override other settings based on chain.
-    pub fn local_settings(self, builder: &mut CosmosBuilder) {
+    pub fn local_settings(&self, builder: &mut CosmosBuilder) {
         match self {
             CosmosNetwork::JunoTestnet
             | CosmosNetwork::JunoMainnet
@@ -179,6 +218,7 @@ impl CosmosNetwork {
             | CosmosNetwork::StargazeTestnet
             | CosmosNetwork::StargazeMainnet
             | CosmosNetwork::NeutronMainnet
+            | CosmosNetwork::CustomNetwork(_)
             | CosmosNetwork::NeutronTestnet => (),
             CosmosNetwork::OsmosisMainnet => {
                 builder.set_osmosis_mainnet_chain_paused();
@@ -230,6 +270,7 @@ impl CosmosNetwork {
             | CosmosNetwork::InjectiveTestnet
             | CosmosNetwork::InjectiveMainnet
             | CosmosNetwork::NeutronMainnet
+            | CosmosNetwork::CustomNetwork(_)
             | CosmosNetwork::NeutronTestnet => Ok(()),
             CosmosNetwork::OsmosisMainnet => {
                 builder.set_gas_price_method(

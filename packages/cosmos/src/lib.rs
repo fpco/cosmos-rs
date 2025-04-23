@@ -7,7 +7,7 @@ pub use codeid::CodeId;
 pub use config::{CosmosConfig, CosmosConfigError};
 pub use contract::{Contract, ContractAdmin, HasContract};
 pub use cosmos_builder::CosmosBuilder;
-pub use cosmos_network::CosmosNetwork;
+pub use cosmos_network::{CosmosNetwork, CosmosNetworkInfo};
 pub use cosmos_sdk_proto as proto;
 pub use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
 pub use error::Error;

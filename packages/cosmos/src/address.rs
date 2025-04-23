@@ -430,19 +430,21 @@ impl HasAddressHrp for CosmosBuilder {
 
 impl HasAddressHrp for CosmosNetwork {
     fn get_address_hrp(&self) -> AddressHrp {
-        AddressHrp::from_static(match self {
+        AddressHrp::from_string(match self {
             CosmosNetwork::JunoTestnet | CosmosNetwork::JunoMainnet | CosmosNetwork::JunoLocal => {
-                "juno"
+                "juno".to_string()
             }
             CosmosNetwork::OsmosisMainnet
             | CosmosNetwork::OsmosisTestnet
-            | CosmosNetwork::OsmosisLocal => "osmo",
-            CosmosNetwork::WasmdLocal => "wasm",
-            CosmosNetwork::SeiMainnet | CosmosNetwork::SeiTestnet => "sei",
-            CosmosNetwork::StargazeTestnet | CosmosNetwork::StargazeMainnet => "stars",
-            CosmosNetwork::InjectiveTestnet | CosmosNetwork::InjectiveMainnet => "inj",
-            CosmosNetwork::NeutronMainnet | CosmosNetwork::NeutronTestnet => "neutron",
+            | CosmosNetwork::OsmosisLocal => "osmo".to_string(),
+            CosmosNetwork::WasmdLocal => "wasm".to_string(),
+            CosmosNetwork::SeiMainnet | CosmosNetwork::SeiTestnet => "sei".to_string(),
+            CosmosNetwork::StargazeTestnet | CosmosNetwork::StargazeMainnet => "stars".to_string(),
+            CosmosNetwork::InjectiveTestnet | CosmosNetwork::InjectiveMainnet => "inj".to_string(),
+            CosmosNetwork::NeutronMainnet | CosmosNetwork::NeutronTestnet => "neutron".to_string(),
+            CosmosNetwork::CustomNetwork(info) => info.hrp.clone(),
         })
+        .unwrap()
     }
 }
 
