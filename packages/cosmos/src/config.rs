@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -9,7 +9,7 @@ use figment::{
     Figment,
 };
 
-use crate::{AddressHrp, CosmosBuilder, CosmosNetwork};
+use crate::{AddressHrp, ContractType, CosmosBuilder, CosmosNetwork};
 
 /// Configuration overrides for individual network
 #[derive(Debug)]
@@ -34,6 +34,8 @@ struct NetworkConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     grpc_fallbacks: Vec<String>,
     gas_multiplier: Option<f64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    code_ids: BTreeMap<ContractType, u64>,
 }
 
 impl NetworkConfig {
@@ -50,10 +52,16 @@ impl NetworkConfig {
         if let Some(hrp) = self.hrp {
             builder.set_hrp(hrp);
         }
+        for (contract_type, code_id) in &self.code_ids {
+            builder.set_code_id(*contract_type, *code_id);
+        }
     }
     fn apply_extra_config(&self, builder: &mut CosmosBuilder) {
         for fallback in &self.grpc_fallbacks {
             builder.add_grpc_fallback_url(fallback);
+        }
+        for (contract_type, code_id) in &self.code_ids {
+            builder.set_code_id(*contract_type, *code_id);
         }
         if let Some(gas_multiplier) = self.gas_multiplier {
             builder.set_gas_estimate_multiplier(gas_multiplier)
@@ -203,6 +211,7 @@ impl CosmosConfig {
                 hrp,
                 grpc_fallbacks,
                 gas_multiplier,
+                code_ids,
             },
         ) in networks
         {
@@ -226,6 +235,9 @@ impl CosmosConfig {
             if let Some(gas_multiplier) = gas_multiplier {
                 println!("Gas multiplier: {gas_multiplier}");
             }
+            for (contract_type, code_id) in code_ids {
+                println!("Code ID for {contract_type}: {code_id}");
+            }
         }
     }
 
@@ -247,6 +259,7 @@ impl CosmosConfig {
                 hrp: Some(hrp),
                 grpc_fallbacks: vec![],
                 gas_multiplier: None,
+                code_ids: BTreeMap::new(),
             },
         );
     }
@@ -301,6 +314,16 @@ impl CosmosConfig {
             .or_default()
             .grpc_fallbacks
             .push(url);
+    }
+
+    /// Add a new contract type/code ID mapping.
+    pub fn add_contract(&mut self, name: String, contract_type: ContractType, code_id: u64) {
+        self.inner
+            .network
+            .entry(name)
+            .or_default()
+            .code_ids
+            .insert(contract_type, code_id);
     }
 }
 

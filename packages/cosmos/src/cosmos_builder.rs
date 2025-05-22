@@ -1,9 +1,9 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use crate::{
     gas_multiplier::{GasMultiplier, GasMultiplierConfig},
     gas_price::GasPriceMethod,
-    AddressHrp, DynamicGasMultiplier,
+    AddressHrp, ContractType, DynamicGasMultiplier,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -50,6 +50,7 @@ pub struct CosmosBuilder {
     keep_alive_while_idle: Option<bool>,
     simulate_with_gas_coin: bool,
     delay_before_fallback: Option<tokio::time::Duration>,
+    pub(crate) code_ids: BTreeMap<ContractType, u64>,
 }
 
 impl CosmosBuilder {
@@ -96,6 +97,7 @@ impl CosmosBuilder {
             keep_alive_while_idle: None,
             simulate_with_gas_coin,
             delay_before_fallback: None,
+            code_ids: BTreeMap::new(),
         }
     }
 
@@ -153,6 +155,11 @@ impl CosmosBuilder {
     /// See [Self::hrp]
     pub fn set_hrp(&mut self, hrp: AddressHrp) {
         self.hrp = hrp;
+    }
+
+    /// Set a code ID for the given contract type.
+    pub fn set_code_id(&mut self, contract_type: ContractType, code_id: u64) {
+        self.code_ids.insert(contract_type, code_id);
     }
 
     /// Revert to the default gas multiplier value (static value of 1.3).

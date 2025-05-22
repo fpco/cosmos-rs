@@ -3,7 +3,10 @@ use std::{collections::HashMap, str::FromStr};
 use serde::de::Visitor;
 use strum_macros::{EnumString, IntoStaticStr};
 
-use crate::{error::BuilderError, gas_price::GasPriceMethod, Cosmos, CosmosBuilder, HasAddressHrp};
+use crate::{
+    error::BuilderError, gas_price::GasPriceMethod, ContractType, Cosmos, CosmosBuilder,
+    HasAddressHrp,
+};
 
 /// A set of known networks.
 ///
@@ -209,6 +212,30 @@ impl CosmosNetwork {
                 // https://github.com/cosmos/chain-registry/blob/master/injective/chain.json
                 builder.set_gas_price(500000000.0, 900000000.0);
             }
+        }
+
+        match self {
+            CosmosNetwork::OsmosisMainnet => {
+                builder.set_code_id(ContractType::Cw3Flex, 100);
+                builder.set_code_id(ContractType::Cw4Group, 101);
+            }
+            CosmosNetwork::OsmosisTestnet => {
+                builder.set_code_id(ContractType::Cw3Flex, 1519);
+                builder.set_code_id(ContractType::Cw4Group, 1521);
+            }
+            CosmosNetwork::SeiMainnet => {
+                builder.set_code_id(ContractType::Cw3Flex, 46);
+                builder.set_code_id(ContractType::Cw4Group, 47);
+            }
+            CosmosNetwork::InjectiveMainnet => {
+                builder.set_code_id(ContractType::Cw3Flex, 124);
+                builder.set_code_id(ContractType::Cw4Group, 125);
+            }
+            CosmosNetwork::NeutronMainnet => {
+                builder.set_code_id(ContractType::Cw3Flex, 1189);
+                builder.set_code_id(ContractType::Cw4Group, 1190);
+            }
+            _ => (),
         }
     }
 

@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use cosmos_sdk_proto::cosmos::tx::v1beta1::OrderBy;
 use http::uri::InvalidUri;
 
-use crate::{Address, AddressHrp, CosmosBuilder, TxBuilder};
+use crate::{Address, AddressHrp, ContractType, CosmosBuilder, TxBuilder};
 
 /// Errors that can occur with token factory
 #[derive(thiserror::Error, Debug, Clone)]
@@ -344,6 +344,9 @@ pub enum Error {
     WasmGzipFailed {
         source: std::io::Error,
     },
+    ContractTypeNotConfigured {
+        contract_type: ContractType,
+    },
 }
 
 impl Display for Error {
@@ -410,6 +413,9 @@ impl Error {
             Error::Connection(e) => e.fmt_helper(f, pretty),
             Error::WasmGzipFailed { source } => {
                 write!(f, "Error during wasm Gzip compression: {source}")
+            }
+            Error::ContractTypeNotConfigured { contract_type } => {
+                write!(f, "Contract type not configured: {contract_type}")
             }
         }
     }

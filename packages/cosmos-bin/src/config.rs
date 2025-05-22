@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::Result;
-use cosmos::{AddressHrp, CosmosConfig, CosmosConfigError};
+use cosmos::{AddressHrp, ContractType, CosmosConfig, CosmosConfigError};
 
 #[derive(clap::Parser)]
 pub(crate) enum Opt {
@@ -45,6 +45,15 @@ pub(crate) enum Opt {
         name: String,
         /// gRPC URL
         url: String,
+    },
+    /// Add a recognized contract code ID
+    AddContract {
+        /// Network name
+        name: String,
+        /// Contract type
+        contract_type: ContractType,
+        /// Code ID
+        code_id: u64,
     },
 }
 
@@ -124,6 +133,17 @@ pub(crate) fn go(opt: crate::cli::Opt, inner: Opt) -> Result<()> {
         Opt::AddFallback { name, url } => {
             let mut config = load(&opt)?;
             config.add_grpc_fallback(name, url);
+            config.save()?;
+            println!("Changes saved");
+            Ok(())
+        }
+        Opt::AddContract {
+            name,
+            contract_type,
+            code_id,
+        } => {
+            let mut config = load(&opt)?;
+            config.add_contract(name, contract_type, code_id);
             config.save()?;
             println!("Changes saved");
             Ok(())
