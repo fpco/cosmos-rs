@@ -151,3 +151,44 @@ impl HasAddressHrp for CodeId {
         self.client.get_address_hrp()
     }
 }
+
+/// A type of contract which is understood by this library.
+///
+/// This is used to allow configuring generally reusable contracts like CW3 multisigs.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    strum_macros::AsRefStr,
+    strum_macros::Display,
+    strum_macros::EnumString,
+)]
+#[serde(rename_all = "kebab-case")]
+#[strum(serialize_all = "kebab-case")]
+#[non_exhaustive]
+pub enum ContractType {
+    /// CW3 flex multisig contract
+    Cw3Flex,
+    /// CW4 group contract
+    Cw4Group,
+}
+
+impl Cosmos {
+    /// Get the configured code ID for the given contract type.
+    ///
+    /// Returns an error if no such contract type is configured.
+    pub fn get_code_id_for(&self, contract_type: ContractType) -> crate::Result<u64> {
+        self.get_cosmos_builder()
+            .code_ids
+            .get(&contract_type)
+            .copied()
+            .ok_or(crate::Error::ContractTypeNotConfigured { contract_type })
+    }
+}
