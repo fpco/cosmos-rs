@@ -69,7 +69,7 @@ impl FromStr for ParsedCoin {
                 let (amount, denom) = s.split_at(denom_first_index);
 
                 for char in denom.chars() {
-                    if !char.is_ascii_alphanumeric() && char != '/' && char != '-'{
+                    if !char.is_ascii_alphanumeric() && char != '/' && char != '-' {
                         return Err(ParsedCoinError::InvalidDenom {
                             input: s.to_owned(),
                         });
