@@ -1,9 +1,10 @@
+use prost::Message;
 use tonic::{async_trait, GrpcMethod};
 
 use crate::{
     client::{node::Node, query::GrpcRequest},
     error::Action,
-    Cosmos,
+    Address, Cosmos, TxMessage,
 };
 
 impl Cosmos {
@@ -117,13 +118,16 @@ impl GrpcRequest for QueryPoolsRequest {
 }
 
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryPoolRequest {
+pub(crate) struct QueryPoolRequest {
     #[prost(string, tag = "1")]
     pub asset: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub height: ::prost::alloc::string::String,
 }
+
+/// Response with information on a THORChain pool.
 #[derive(Clone, PartialEq, ::prost::Message)]
+#[allow(missing_docs)]
 pub struct QueryPoolResponse {
     #[prost(string, tag = "1")]
     pub asset: ::prost::alloc::string::String,
@@ -188,12 +192,99 @@ pub struct QueryPoolResponse {
     pub derived_depth_bps: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryPoolsRequest {
+pub(crate) struct QueryPoolsRequest {
     #[prost(string, tag = "1")]
     pub height: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
+#[allow(missing_docs)]
 pub struct QueryPoolsResponse {
     #[prost(message, repeated, tag = "1")]
     pub pools: ::prost::alloc::vec::Vec<QueryPoolResponse>,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+struct MsgDepositInner {
+    #[prost(message, repeated, tag = "1")]
+    coins: Vec<RujiraCoin>,
+    #[prost(string, tag = "2")]
+    memo: String,
+    #[prost(bytes, tag = "3")]
+    signer: Vec<u8>,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+struct RujiraCoin {
+    #[prost(message, tag = "1")]
+    asset: Option<RujiraAsset>,
+    #[prost(string, tag = "2")]
+    amount: String,
+    #[prost(int64, tag = "3")]
+    decimals: i64,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+struct RujiraAsset {
+    #[prost(string, tag = "1")]
+    chain: String,
+    #[prost(string, tag = "2")]
+    symbol: String,
+    #[prost(string, tag = "3")]
+    ticker: String,
+    #[prost(bool, tag = "4")]
+    synth: bool,
+    #[prost(bool, tag = "5")]
+    trade: bool,
+    #[prost(bool, tag = "6")]
+    secured: bool,
+}
+
+/// A Rujira `MsgDeposit`, used for withdrawing secured assets.
+pub struct MsgDeposit {
+    /// Chain to withdraw to
+    pub chain: String,
+    /// Symbol to withdraw
+    pub symbol: String,
+    /// Amount of asset to withdraw, given in 10e-8 units
+    pub amount: u128,
+    /// Destination to send the asset to
+    pub destination: String,
+    /// Account sending the funds
+    pub signer: Address,
+}
+
+impl From<MsgDeposit> for TxMessage {
+    fn from(
+        MsgDeposit {
+            chain,
+            symbol,
+            amount,
+            destination,
+            signer,
+        }: MsgDeposit,
+    ) -> Self {
+        let description =
+            format!("Withdraw secured assets: {amount}{chain}-{symbol} to {destination}");
+        TxMessage::new(
+            "/types.MsgDeposit",
+            MsgDepositInner {
+                coins: vec![RujiraCoin {
+                    asset: Some(RujiraAsset {
+                        chain,
+                        symbol: symbol.clone(),
+                        ticker: symbol,
+                        synth: false,
+                        trade: false,
+                        secured: true,
+                    }),
+                    amount: amount.to_string(),
+                    decimals: 0,
+                }],
+                memo: format!("secure-:{destination}"),
+                signer: signer.raw().as_ref().to_owned(),
+            }
+            .encode_to_vec(),
+            description,
+        )
+    }
 }
