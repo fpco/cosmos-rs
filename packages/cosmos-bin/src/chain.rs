@@ -6,9 +6,10 @@ use cosmos::{
     proto::{
         cosmos::{
             base::abci::v1beta1::TxResponse,
-            tx::v1beta1::{AuthInfo, OrderBy, Tx},
+            tx::v1beta1::{AuthInfo, OrderBy, Tx, TxBody},
         },
         traits::Message,
+        Any,
     },
     Address, BlockInfo, Cosmos, TxResponseExt,
 };
@@ -180,7 +181,7 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
             let tx = tx.context("Missing tx field")?;
             println!("Encoded length: {}", tx.encoded_len());
             let Tx {
-                body: _,
+                body,
                 auth_info,
                 signatures: _,
             } = Tx::decode(&*tx.value)?;
@@ -201,6 +202,20 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
             println!();
             println!("Signer count: {}", signer_infos.len());
             if complete {
+                let TxBody {
+                    messages,
+                    memo,
+                    timeout_height: _,
+                    extension_options: _,
+                    non_critical_extension_options: _,
+                } = body.context("No body provided")?;
+                println!("Memo: {memo}");
+                for (idx, Any { type_url, value }) in messages.into_iter().enumerate() {
+                    println!(
+                        "Message #{idx}: {type_url}: {}",
+                        String::from_utf8_lossy(&value)
+                    );
+                }
                 println!("Data: {data}");
                 for (idx, log) in logs.into_iter().enumerate() {
                     println!("Log #{idx}: {log:?}");
