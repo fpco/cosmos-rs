@@ -65,6 +65,8 @@ pub(crate) enum ConfigKey {
     ChainId,
     Hrp,
     GasCoin,
+    LowGasPrice,
+    HighGasPrice,
 }
 
 impl FromStr for ConfigKey {
@@ -125,6 +127,8 @@ pub(crate) fn go(opt: crate::cli::Opt, inner: Opt) -> Result<()> {
                 ConfigKey::ChainId => config.set_chain_id(name, value),
                 ConfigKey::Hrp => config.set_hrp(name, value.parse()?),
                 ConfigKey::GasCoin => config.set_gas_coin(name, value),
+                ConfigKey::LowGasPrice => config.set_low_gas_price(name, value.parse()?),
+                ConfigKey::HighGasPrice => config.set_high_gas_price(name, value.parse()?),
             }
             config.save()?;
             println!("Changes saved");

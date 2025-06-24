@@ -9,7 +9,7 @@ use figment::{
     Figment,
 };
 
-use crate::{AddressHrp, ContractType, CosmosBuilder, CosmosNetwork};
+use crate::{gas_price::GasPriceMethod, AddressHrp, ContractType, CosmosBuilder, CosmosNetwork};
 
 /// Configuration overrides for individual network
 #[derive(Debug)]
@@ -36,6 +36,8 @@ struct NetworkConfig {
     gas_multiplier: Option<f64>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     code_ids: BTreeMap<ContractType, u64>,
+    low_gas_price: Option<f64>,
+    high_gas_price: Option<f64>,
 }
 
 impl NetworkConfig {
@@ -52,9 +54,6 @@ impl NetworkConfig {
         if let Some(hrp) = self.hrp {
             builder.set_hrp(hrp);
         }
-        for (contract_type, code_id) in &self.code_ids {
-            builder.set_code_id(*contract_type, *code_id);
-        }
     }
     fn apply_extra_config(&self, builder: &mut CosmosBuilder) {
         for fallback in &self.grpc_fallbacks {
@@ -65,6 +64,18 @@ impl NetworkConfig {
         }
         if let Some(gas_multiplier) = self.gas_multiplier {
             builder.set_gas_estimate_multiplier(gas_multiplier)
+        }
+        let gas_price = match (self.low_gas_price, self.high_gas_price) {
+            (None, None) => None,
+            (Some(x), None) => Some((x, x)),
+            (None, Some(x)) => Some((x, x)),
+            (Some(x), Some(y)) => Some((x, y)),
+        };
+        if let Some((low, high)) = gas_price {
+            builder.set_gas_price_method(GasPriceMethod::new_static(low, high));
+        }
+        for (contract_type, code_id) in &self.code_ids {
+            builder.set_code_id(*contract_type, *code_id);
         }
     }
 }
@@ -212,6 +223,8 @@ impl CosmosConfig {
                 grpc_fallbacks,
                 gas_multiplier,
                 code_ids,
+                low_gas_price,
+                high_gas_price,
             },
         ) in networks
         {
@@ -234,6 +247,12 @@ impl CosmosConfig {
             }
             if let Some(gas_multiplier) = gas_multiplier {
                 println!("Gas multiplier: {gas_multiplier}");
+            }
+            if let Some(low) = low_gas_price {
+                println!("Low gas price: {low}");
+            }
+            if let Some(high) = high_gas_price {
+                println!("High gas price: {high}");
             }
             for (contract_type, code_id) in code_ids {
                 println!("Code ID for {contract_type}: {code_id}");
@@ -260,6 +279,8 @@ impl CosmosConfig {
                 grpc_fallbacks: vec![],
                 gas_multiplier: None,
                 code_ids: BTreeMap::new(),
+                low_gas_price: None,
+                high_gas_price: None,
             },
         );
     }
@@ -324,6 +345,16 @@ impl CosmosConfig {
             .or_default()
             .code_ids
             .insert(contract_type, code_id);
+    }
+
+    /// Set the low gas price
+    pub fn set_low_gas_price(&mut self, name: String, low: f64) {
+        self.inner.network.entry(name).or_default().low_gas_price = Some(low);
+    }
+
+    /// Set the high gas price
+    pub fn set_high_gas_price(&mut self, name: String, high: f64) {
+        self.inner.network.entry(name).or_default().high_gas_price = Some(high);
     }
 }
 
