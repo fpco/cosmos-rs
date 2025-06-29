@@ -149,10 +149,7 @@ impl CosmosConfig {
     /// Generate a builder for the given network name
     ///
     /// If the network name is not a valid [CosmosNetwork], and there are insufficient config settings in the config file, this will generate an error.
-    pub(crate) async fn builder_for(
-        &self,
-        network: &str,
-    ) -> Result<CosmosBuilder, CosmosConfigError> {
+    pub async fn builder_for(&self, network: &str) -> Result<CosmosBuilder, CosmosConfigError> {
         match (
             CosmosNetwork::from_str(network).ok(),
             self.inner.network.get(network),
