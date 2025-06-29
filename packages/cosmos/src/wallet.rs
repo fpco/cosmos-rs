@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, OnceLock};
 
 use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{ripemd160, sha256, Hash};
@@ -10,7 +10,6 @@ use bitcoin::secp256k1::{All, Message, Secp256k1};
 use cosmos_sdk_proto::cosmos::bank::v1beta1::MsgSend;
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos_sdk_proto::cosmos::base::v1beta1::Coin;
-use once_cell::sync::{Lazy, OnceCell};
 use parking_lot::Mutex;
 use rand::Rng;
 use tiny_keccak::{Hasher, Keccak};
@@ -238,8 +237,8 @@ impl DerivationPathConfig {
 
     pub fn as_derivation_path(&self) -> Arc<DerivationPath> {
         type DerivationPathMap = HashMap<DerivationPathConfig, Arc<DerivationPath>>;
-        static PATHS: Lazy<Arc<Mutex<DerivationPathMap>>> =
-            Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+        static PATHS: LazyLock<Arc<Mutex<DerivationPathMap>>> =
+            LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
         let mut guard = PATHS.lock();
         match guard.get(self) {
             Some(s) => s.clone(),
@@ -302,7 +301,7 @@ pub(crate) enum WalletPublicKey {
 }
 
 fn global_secp() -> &'static Secp256k1<All> {
-    static CELL: OnceCell<Secp256k1<All>> = OnceCell::new();
+    static CELL: OnceLock<Secp256k1<All>> = OnceLock::new();
     CELL.get_or_init(Secp256k1::new)
 }
 

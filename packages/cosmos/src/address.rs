@@ -2,12 +2,11 @@ use std::{
     collections::HashSet,
     fmt::{Debug, Display},
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use bech32::{Bech32, Hrp};
 use bitcoin::bip32::DerivationPath;
-use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use serde::de::Visitor;
 
@@ -299,7 +298,7 @@ impl Display for AddressHrp {
 }
 
 type AddressHrpSet = RwLock<HashSet<&'static str>>;
-static ADDRESS_HRPS: OnceCell<AddressHrpSet> = OnceCell::new();
+static ADDRESS_HRPS: OnceLock<AddressHrpSet> = OnceLock::new();
 impl AddressHrp {
     fn get_set() -> &'static AddressHrpSet {
         ADDRESS_HRPS.get_or_init(|| RwLock::new(HashSet::new()))
