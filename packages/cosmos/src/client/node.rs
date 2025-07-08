@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
@@ -90,12 +91,34 @@ impl LastError {
     }
 }
 
+fn parse_cosmos_grpc(value: &str) -> (String, HashMap<String, String>) {
+    let parts: Vec<&str> = value.splitn(2, '#').collect();
+
+    let endpoint = parts[0].trim().to_string();
+    let headers = if parts.len() == 2 {
+        parts[1]
+            .split(';')
+            .filter_map(|pair| {
+                let mut kv = pair.splitn(2, '=');
+                Some((kv.next()?.to_string(), kv.next()?.to_string()))
+            })
+            .collect()
+    } else {
+        HashMap::new()
+    };
+
+    (endpoint, headers)
+}
+
 impl CosmosBuilder {
     pub(crate) fn make_node(
         &self,
         grpc_url: &Arc<String>,
         is_fallback: bool,
     ) -> Result<Node, BuilderError> {
+        let (url, headers) = parse_cosmos_grpc(grpc_url.as_str());
+        let grpc_url = Arc::<String>::new(url);
+
         let grpc_endpoint =
             grpc_url
                 .parse::<Endpoint>()
@@ -144,9 +167,7 @@ impl CosmosBuilder {
 
         let grpc_channel = grpc_endpoint.connect_lazy();
 
-        let referer_header = self.referer_header().map(|x| x.to_owned());
-
-        let interceptor = CosmosInterceptor(referer_header.map(Arc::new));
+        let interceptor = CosmosInterceptor(headers);
         let channel = InterceptedService::new(grpc_channel, interceptor);
         let max_decoding_message_size = self.get_max_decoding_message_size();
 

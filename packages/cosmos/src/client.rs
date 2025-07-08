@@ -31,7 +31,11 @@ use cosmos_sdk_proto::{
 };
 use parking_lot::{Mutex, RwLock};
 use tokio::{sync::mpsc::Receiver, task::JoinSet, time::Instant};
-use tonic::{service::Interceptor, Status};
+use tonic::{
+    metadata::{MetadataKey, MetadataValue},
+    service::Interceptor,
+    Status,
+};
 
 use crate::{
     address::HasAddressHrp,
@@ -739,16 +743,19 @@ impl Cosmos {
 }
 
 #[derive(Clone)]
-pub struct CosmosInterceptor(Option<Arc<String>>);
+pub struct CosmosInterceptor(pub HashMap<String, String>);
 
 impl Interceptor for CosmosInterceptor {
     fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
         let req = request.metadata_mut();
-        if let Some(value) = &self.0 {
-            let value = FromStr::from_str(value);
-            if let Ok(header_value) = value {
-                req.insert("referer", header_value);
-            }
+        for (key, value) in &self.0 {
+            let key = MetadataKey::from_bytes(key.as_bytes())
+                .map_err(|_| Status::internal(format!("Invalid header key: '{}'", key)))?;
+
+            let value = MetadataValue::from_str(value)
+                .map_err(|_| Status::internal(format!("Invalid header value for '{}'", key)))?;
+
+            req.insert(key, value);
         }
         Ok(request)
     }
