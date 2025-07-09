@@ -1,6 +1,6 @@
 use std::{
-    collections::HashMap,
     ops::Deref,
+    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -9,7 +9,9 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use tonic::{
     codegen::InterceptedService,
+    metadata::{Ascii, MetadataKey, MetadataValue},
     transport::{Channel, ClientTlsConfig, Endpoint, Uri},
+    Status,
 };
 
 use crate::{
@@ -91,23 +93,47 @@ impl LastError {
     }
 }
 
-fn parse_cosmos_grpc(value: &str) -> (String, HashMap<String, String>) {
-    let parts: Vec<&str> = value.splitn(2, '#').collect();
+type ParseCosmosGrpcResult =
+    Result<(String, Arc<[(MetadataKey<Ascii>, MetadataValue<Ascii>)]>), Status>;
 
-    let endpoint = parts[0].trim().to_string();
-    let headers = if parts.len() == 2 {
-        parts[1]
-            .split(';')
-            .filter_map(|pair| {
-                let mut kv = pair.splitn(2, '=');
-                Some((kv.next()?.to_string(), kv.next()?.to_string()))
-            })
-            .collect()
-    } else {
-        HashMap::new()
+pub fn parse_cosmos_grpc(value: &str) -> ParseCosmosGrpcResult {
+    let (endpoint, raw_headers) = match value.split_once('#') {
+        Some((endpoint, headers)) => (endpoint.trim().to_string(), Some(headers)),
+        None => (value.trim().to_string(), None),
     };
 
-    (endpoint, headers)
+    let headers = {
+        let mut parsed = Vec::new();
+        if let Some(hdrs) = raw_headers {
+            for pair in hdrs.split(';').filter(|s| !s.trim().is_empty()) {
+                let (key, val) = pair.split_once('=').ok_or_else(|| {
+                    Status::invalid_argument(format!("Malformed header: '{}'", pair))
+                })?;
+
+                let key = MetadataKey::from_bytes(key.trim().as_bytes()).map_err(|_| {
+                    Status::invalid_argument(format!("Invalid header key '{}'", key))
+                })?;
+
+                let val_str = val.trim();
+
+                if val_str.is_empty() {
+                    return Err(Status::invalid_argument(format!(
+                        "Header '{}' has empty value",
+                        key
+                    )));
+                }
+
+                let val = MetadataValue::from_str(val_str).map_err(|_| {
+                    Status::invalid_argument(format!("Invalid header value for '{}'", key))
+                })?;
+
+                parsed.push((key, val));
+            }
+        }
+        Arc::from(parsed.into_boxed_slice())
+    };
+
+    Ok((endpoint, headers))
 }
 
 impl CosmosBuilder {
@@ -116,7 +142,11 @@ impl CosmosBuilder {
         grpc_url: &Arc<String>,
         is_fallback: bool,
     ) -> Result<Node, BuilderError> {
-        let (url, headers) = parse_cosmos_grpc(grpc_url.as_str());
+        let (url, headers) =
+            parse_cosmos_grpc(grpc_url.as_str()).map_err(|e| BuilderError::InvalidGrpcHeaders {
+                grpc_url: grpc_url.clone(),
+                source: e,
+            })?;
         let grpc_url = Arc::<String>::new(url);
 
         let grpc_endpoint =
