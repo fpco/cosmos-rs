@@ -5,7 +5,6 @@ pub(crate) mod query;
 
 use std::{
     collections::HashMap,
-    str::FromStr,
     sync::{Arc, Weak},
 };
 
@@ -31,7 +30,11 @@ use cosmos_sdk_proto::{
 };
 use parking_lot::{Mutex, RwLock};
 use tokio::{sync::mpsc::Receiver, task::JoinSet, time::Instant};
-use tonic::{service::Interceptor, Status};
+use tonic::{
+    metadata::{Ascii, MetadataKey, MetadataValue},
+    service::Interceptor,
+    Status,
+};
 
 use crate::{
     address::HasAddressHrp,
@@ -739,16 +742,13 @@ impl Cosmos {
 }
 
 #[derive(Clone)]
-pub struct CosmosInterceptor(Option<Arc<String>>);
+pub struct CosmosInterceptor(Arc<[(MetadataKey<Ascii>, MetadataValue<Ascii>)]>);
 
 impl Interceptor for CosmosInterceptor {
     fn call(&mut self, mut request: tonic::Request<()>) -> Result<tonic::Request<()>, Status> {
-        let req = request.metadata_mut();
-        if let Some(value) = &self.0 {
-            let value = FromStr::from_str(value);
-            if let Ok(header_value) = value {
-                req.insert("referer", header_value);
-            }
+        let meta = request.metadata_mut();
+        for (key, value) in self.0.iter() {
+            meta.insert(key, value.clone());
         }
         Ok(request)
     }

@@ -1,5 +1,6 @@
 use std::{
     ops::Deref,
+    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -8,7 +9,9 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use tonic::{
     codegen::InterceptedService,
+    metadata::{Ascii, MetadataKey, MetadataValue},
     transport::{Channel, ClientTlsConfig, Endpoint, Uri},
+    Status,
 };
 
 use crate::{
@@ -90,12 +93,62 @@ impl LastError {
     }
 }
 
+type ParseCosmosGrpcResult =
+    Result<(String, Arc<[(MetadataKey<Ascii>, MetadataValue<Ascii>)]>), Status>;
+
+pub fn parse_cosmos_grpc(value: &str) -> ParseCosmosGrpcResult {
+    let (endpoint, raw_headers) = match value.split_once('#') {
+        Some((endpoint, headers)) => (endpoint.trim().to_string(), Some(headers)),
+        None => (value.trim().to_string(), None),
+    };
+
+    let headers = {
+        let mut parsed = Vec::new();
+        if let Some(hdrs) = raw_headers {
+            for pair in hdrs.split(';').filter(|s| !s.trim().is_empty()) {
+                let (key, val) = pair.split_once('=').ok_or_else(|| {
+                    Status::invalid_argument(format!("Malformed header: '{}'", pair))
+                })?;
+
+                let key = MetadataKey::from_bytes(key.trim().as_bytes()).map_err(|_| {
+                    Status::invalid_argument(format!("Invalid header key '{}'", key))
+                })?;
+
+                let val_str = val.trim();
+
+                if val_str.is_empty() {
+                    return Err(Status::invalid_argument(format!(
+                        "Header '{}' has empty value",
+                        key
+                    )));
+                }
+
+                let val = MetadataValue::from_str(val_str).map_err(|_| {
+                    Status::invalid_argument(format!("Invalid header value for '{}'", key))
+                })?;
+
+                parsed.push((key, val));
+            }
+        }
+        Arc::from(parsed.into_boxed_slice())
+    };
+
+    Ok((endpoint, headers))
+}
+
 impl CosmosBuilder {
     pub(crate) fn make_node(
         &self,
         grpc_url: &Arc<String>,
         is_fallback: bool,
     ) -> Result<Node, BuilderError> {
+        let (url, mut headers) =
+            parse_cosmos_grpc(grpc_url.as_str()).map_err(|e| BuilderError::InvalidGrpcHeaders {
+                grpc_url: grpc_url.clone(),
+                source: e,
+            })?;
+        let grpc_url = Arc::<String>::new(url);
+
         let grpc_endpoint =
             grpc_url
                 .parse::<Endpoint>()
@@ -144,9 +197,23 @@ impl CosmosBuilder {
 
         let grpc_channel = grpc_endpoint.connect_lazy();
 
-        let referer_header = self.referer_header().map(|x| x.to_owned());
+        if let Some(referer) = self.referer_header() {
+            if !headers.iter().any(|(k, _)| k.as_str() == "referer") {
+                let mut vec = headers.as_ref().to_vec();
+                vec.push((
+                    MetadataKey::from_bytes(b"referer").unwrap(),
+                    MetadataValue::from_str(referer).map_err(|_| {
+                        BuilderError::InvalidRefererHeader {
+                            referer: Arc::new(referer.to_string()),
+                            source: Status::invalid_argument("Invalid referer header value"),
+                        }
+                    })?,
+                ));
+                headers = Arc::from(vec.into_boxed_slice());
+            }
+        }
 
-        let interceptor = CosmosInterceptor(referer_header.map(Arc::new));
+        let interceptor = CosmosInterceptor(headers);
         let channel = InterceptedService::new(grpc_channel, interceptor);
         let max_decoding_message_size = self.get_max_decoding_message_size();
 

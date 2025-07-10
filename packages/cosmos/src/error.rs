@@ -102,6 +102,16 @@ pub enum BuilderError {
     SanityQueryFailed { source: QueryError },
     #[error("Could not find Sei gas config for chain ID {chain_id} at {url}")]
     SeiGasConfigNotFound { chain_id: String, url: String },
+    #[error("Invalid gRPC headers in {grpc_url}: {source}")]
+    InvalidGrpcHeaders {
+        grpc_url: Arc<String>,
+        source: tonic::Status,
+    },
+    #[error("Invalid referer header in {referer}: {source}")]
+    InvalidRefererHeader {
+        referer: Arc<String>,
+        source: tonic::Status,
+    },
 }
 
 /// Parse errors while interacting with chain data.
