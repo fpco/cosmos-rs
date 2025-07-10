@@ -197,8 +197,8 @@ impl CosmosBuilder {
 
         let grpc_channel = grpc_endpoint.connect_lazy();
 
-        if !headers.iter().any(|(k, _)| k.as_str() == "referer") {
-            if let Some(referer) = self.referer_header() {
+        if let Some(referer) = self.referer_header() {
+            if !headers.iter().any(|(k, _)| k.as_str() == "referer") {
                 let mut vec = headers.as_ref().to_vec();
                 vec.push((
                     MetadataKey::from_bytes(b"referer").unwrap(),
