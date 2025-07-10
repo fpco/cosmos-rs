@@ -142,7 +142,7 @@ impl CosmosBuilder {
         grpc_url: &Arc<String>,
         is_fallback: bool,
     ) -> Result<Node, BuilderError> {
-        let (url, headers) =
+        let (url, mut headers) =
             parse_cosmos_grpc(grpc_url.as_str()).map_err(|e| BuilderError::InvalidGrpcHeaders {
                 grpc_url: grpc_url.clone(),
                 source: e,
@@ -196,6 +196,22 @@ impl CosmosBuilder {
         };
 
         let grpc_channel = grpc_endpoint.connect_lazy();
+
+        if !headers.iter().any(|(k, _)| k.as_str() == "referer") {
+            if let Some(referer) = self.referer_header() {
+                let mut vec = headers.as_ref().to_vec();
+                vec.push((
+                    MetadataKey::from_bytes(b"referer").unwrap(),
+                    MetadataValue::from_str(referer).map_err(|_| {
+                        BuilderError::InvalidRefererHeader {
+                            referer: Arc::new(referer.to_string()),
+                            source: Status::invalid_argument("Invalid referer header value"),
+                        }
+                    })?,
+                ));
+                headers = Arc::from(vec.into_boxed_slice());
+            }
+        }
 
         let interceptor = CosmosInterceptor(headers);
         let channel = InterceptedService::new(grpc_channel, interceptor);
