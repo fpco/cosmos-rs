@@ -512,7 +512,7 @@ async fn run_query<Request: GrpcRequest>(
 
     // Prepare for parallel execution
     let mut set = JoinSet::new();
-    let (tx, rx) = tokio::sync::mpsc::channel(nodes.len());
+    let (tx, rx) = tokio::sync::mpsc::channel(nodes.len().max(4));
 
     for (node_idx, node) in nodes.into_iter().enumerate() {
         // Cloning for passing into the async move
