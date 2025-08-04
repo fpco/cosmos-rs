@@ -168,7 +168,7 @@ impl CosmosNetwork {
             }
             // https://docs.injective.network/develop/public-endpoints/
             CosmosNetwork::InjectiveMainnet => "https://sentry.chain.grpc.injective.network",
-            CosmosNetwork::NeutronMainnet => "http://grpc-kralum.neutron-1.neutron.org",
+            CosmosNetwork::NeutronMainnet => "https://grpc-kralum.neutron-1.neutron.org:443",
             CosmosNetwork::NeutronTestnet => "http://grpc-falcron.pion-1.ntrn.tech",
         }
     }
