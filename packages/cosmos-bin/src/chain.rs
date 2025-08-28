@@ -79,6 +79,16 @@ pub(crate) enum Subcommand {
         #[clap(long)]
         page: Option<u64>,
     },
+    /// List transactions against a given contract
+    ListContractTxs {
+        contract: Address,
+        /// Maximum number of transactions to return
+        #[clap(long)]
+        limit: Option<u64>,
+        /// Page
+        #[clap(long)]
+        page: Option<u64>,
+    },
     /// Perform a query for transactions
     QueryTxs {
         query: String,
@@ -232,6 +242,19 @@ pub(crate) async fn go(Opt { sub }: Opt, opt: crate::cli::Opt) -> Result<()> {
         } => {
             let cosmos = opt.network_opt.build().await?;
             for txhash in cosmos.list_transactions_for(address, limit, page).await? {
+                println!("{txhash}");
+            }
+        }
+        Subcommand::ListContractTxs {
+            contract,
+            limit,
+            page,
+        } => {
+            let cosmos = opt.network_opt.build().await?;
+            for txhash in cosmos
+                .list_contract_transactions(contract, limit, page)
+                .await?
+            {
                 println!("{txhash}");
             }
         }

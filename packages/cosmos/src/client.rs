@@ -1108,6 +1108,36 @@ impl Cosmos {
             })
     }
 
+    /// Get a list of txhashes for transactions against the given contract.
+    pub async fn list_contract_transactions(
+        &self,
+        address: Address,
+        limit: Option<u64>,
+        page: Option<u64>,
+    ) -> Result<Vec<String>, QueryError> {
+        // The pagination field within this struct is
+        // deprecated. https://docs.rs/cosmos-sdk-proto/0.21.1/cosmos_sdk_proto/cosmos/tx/v1beta1/struct.GetTxsEventRequest.html#structfield.pagination
+        #[allow(deprecated)]
+        let req = GetTxsEventRequest {
+            events: vec![],
+            pagination: None,
+            order_by: OrderBy::Asc as i32,
+            page: page.unwrap_or(1),
+            limit: limit.unwrap_or(10),
+            query: format!("execute._contract_address='{address}'"),
+        };
+        self.perform_query(req, Action::ListTransactionsFor(address))
+            .run()
+            .await
+            .map(|x| {
+                x.into_inner()
+                    .tx_responses
+                    .into_iter()
+                    .map(|x| x.txhash)
+                    .collect()
+            })
+    }
+
     /// Get transactions meeting the given query.
     pub async fn query_transactions(
         &self,
