@@ -213,6 +213,20 @@ impl CosmosBuilder {
             }
         }
 
+        if let Some(auth_value) = self.grpc_auth_header() {
+            let mut vec = headers.as_ref().to_vec();
+            vec.push((
+                MetadataKey::from_bytes(b"authorization").unwrap(),
+                MetadataValue::from_str(auth_value).map_err(|_| {
+                    BuilderError::InvalidAuthHeaders {
+                        grpc_url: grpc_url.clone(),
+                        source: tonic::Status::invalid_argument("Invalid authorization header"),
+                    }
+                })?,
+            ));
+            headers = Arc::from(vec.into_boxed_slice());
+        }
+
         let interceptor = CosmosInterceptor(headers);
         let channel = InterceptedService::new(grpc_channel, interceptor);
         let max_decoding_message_size = self.get_max_decoding_message_size();

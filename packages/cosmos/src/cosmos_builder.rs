@@ -17,6 +17,7 @@ pub(crate) struct OsmosisGasParams {
 pub struct CosmosBuilder {
     grpc_url: Arc<String>,
     grpc_fallback_urls: Vec<Arc<String>>,
+    grpc_auth_header: Option<String>,
     chain_id: String,
     gas_coin: String,
     hrp: AddressHrp,
@@ -66,6 +67,7 @@ impl CosmosBuilder {
         Self {
             grpc_url: Arc::new(grpc_url.into()),
             grpc_fallback_urls: vec![],
+            grpc_auth_header: None,
             chain_id,
             gas_coin: gas_coin.into(),
             hrp,
@@ -125,6 +127,16 @@ impl CosmosBuilder {
     /// gRPC fallback URLs
     pub fn grpc_fallback_urls(&self) -> &Vec<Arc<String>> {
         &self.grpc_fallback_urls
+    }
+
+    /// Set a gRPC Authorization header ("Bearer <token>")
+    pub fn set_grpc_auth_header(&mut self, auth_header: impl Into<String>) {
+        self.grpc_auth_header = Some(auth_header.into());
+    }
+
+    /// Get the configured Authorization header
+    pub fn grpc_auth_header(&self) -> Option<&str> {
+        self.grpc_auth_header.as_deref()
     }
 
     /// Chain ID we want to communicate with

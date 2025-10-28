@@ -107,6 +107,11 @@ pub enum BuilderError {
         grpc_url: Arc<String>,
         source: tonic::Status,
     },
+    #[error("Invalid authorization gRPC headers in {grpc_url}: {source}")]
+    InvalidAuthHeaders {
+        grpc_url: Arc<String>,
+        source: tonic::Status,
+    },
     #[error("Invalid referer header in {referer}: {source}")]
     InvalidRefererHeader {
         referer: Arc<String>,
