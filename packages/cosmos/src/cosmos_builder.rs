@@ -421,7 +421,11 @@ impl CosmosBuilder {
     }
 
     pub(crate) fn get_init_max_gas_price(&self) -> f64 {
-        self.max_price.unwrap_or(0.01)
+        self.max_price.unwrap_or(if self.chain_id() == "osmosis-1" {
+            0.2
+        } else {
+            0.01
+        })
     }
 
     /// How many seconds old the Osmosis gas price needs to be before we recheck.
