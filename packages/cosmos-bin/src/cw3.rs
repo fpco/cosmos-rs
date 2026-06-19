@@ -68,7 +68,7 @@ enum Subcommand {
 pub(crate) async fn go(cosmos: Cosmos, Opt { sub }: Opt) -> Result<()> {
     match sub {
         Subcommand::NewFlex { inner } => new_flex(cosmos, inner).await,
-        Subcommand::UpdateMembersMessage { inner } => update_members_message(inner).await,
+        Subcommand::UpdateMembersMessage { inner } => update_members_message(&cosmos, inner).await,
         Subcommand::Propose { inner } => propose(cosmos, inner).await,
         Subcommand::List { inner } => list(cosmos, inner).await,
         Subcommand::Vote { inner } => vote(cosmos, inner).await,
@@ -203,27 +203,86 @@ struct AddMemberMessageOpt {
     /// CW4 group contract address
     #[clap(long)]
     group: Address,
+    /// Simulate the update as the CW4 group's admin
+    #[clap(long)]
+    simulate: bool,
 }
 
 async fn update_members_message(
-    AddMemberMessageOpt { add, remove, group }: AddMemberMessageOpt,
+    cosmos: &Cosmos,
+    AddMemberMessageOpt {
+        add,
+        remove,
+        group,
+        simulate,
+    }: AddMemberMessageOpt,
 ) -> Result<()> {
-    let msg = cw4_group::msg::ExecuteMsg::UpdateMembers {
-        add: add
-            .into_iter()
-            .map(|x| Member {
-                addr: x.get_address_string(),
-                weight: 1,
-            })
-            .collect(),
-        remove: remove.into_iter().map(|x| x.get_address_string()).collect(),
+    let add: Vec<_> = add
+        .into_iter()
+        .map(|addr| Member {
+            addr: addr.get_address_string(),
+            weight: 1,
+        })
+        .collect();
+    let remove: Vec<_> = remove.into_iter().map(|x| x.get_address_string()).collect();
+    let update_msg = cw4_group::msg::ExecuteMsg::UpdateMembers {
+        add: add.clone(),
+        remove: remove.clone(),
     };
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: group.get_address_string(),
-        msg: to_json_binary(&msg)?,
+        msg: to_json_binary(&update_msg)?,
         funds: vec![],
     });
     println!("{}", serde_json::to_string(&msg)?);
+
+    if simulate {
+        let group_contract = cosmos.make_contract(group);
+
+        for addr in &remove {
+            let member: cw4::MemberResponse = group_contract
+                .query(cw4_group::msg::QueryMsg::Member {
+                    addr: addr.clone(),
+                    at_height: None,
+                })
+                .await?;
+            anyhow::ensure!(
+                member.weight.is_some(),
+                "Cannot remove {addr}: address is not a member of the CW4 group"
+            );
+        }
+
+        for Member { addr, weight: _ } in &add {
+            let member: cw4::MemberResponse = group_contract
+                .query(cw4_group::msg::QueryMsg::Member {
+                    addr: addr.clone(),
+                    at_height: None,
+                })
+                .await?;
+            anyhow::ensure!(
+                member.weight.is_none(),
+                "Cannot add {addr}: address is already a member of the CW4 group"
+            );
+        }
+
+        println!(
+            "Membership preflight successful: {} add(s), {} remove(s)",
+            add.len(),
+            remove.len()
+        );
+
+        let info = group_contract.info().await?;
+        let admin = info
+            .admin
+            .parse::<Address>()
+            .context("CW4 group contract does not have a valid admin address")?;
+        println!("CW4 group admin: {admin}");
+
+        let mut tx = TxBuilder::default();
+        tx.add_execute_message(group, admin, vec![], &update_msg)?;
+        let res = tx.simulate(cosmos, &[admin.get_address()]).await?;
+        println!("Simulation successful. Gas used: {}", res.gas_used);
+    }
     Ok(())
 }
 
