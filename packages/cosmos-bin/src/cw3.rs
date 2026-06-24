@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anyhow::{Context, Result};
 use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, ContractAdmin, ContractType, Cosmos,
@@ -194,9 +196,9 @@ async fn new_flex(
 
 #[derive(clap::Parser)]
 struct AddMemberMessageOpt {
-    /// Members to add
+    /// Members to add, optionally with a voting weight as ADDRESS@WEIGHT
     #[clap(long)]
-    add: Vec<Address>,
+    add: Vec<MemberToAdd>,
     /// Members to remove
     #[clap(long)]
     remove: Vec<Address>,
@@ -206,6 +208,33 @@ struct AddMemberMessageOpt {
     /// Simulate the update as the CW4 group's admin
     #[clap(long)]
     simulate: bool,
+}
+
+#[derive(Clone)]
+struct MemberToAdd {
+    addr: Address,
+    weight: u64,
+}
+
+impl FromStr for MemberToAdd {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (addr, weight) = match s.rsplit_once('@') {
+            Some((addr, weight)) => {
+                anyhow::ensure!(!addr.is_empty(), "missing address before @");
+                anyhow::ensure!(!weight.is_empty(), "missing weight after @");
+                (
+                    addr.parse().context("invalid member address")?,
+                    weight.parse().context("invalid member weight")?,
+                )
+            }
+            None => (s.parse().context("invalid member address")?, 1),
+        };
+
+        anyhow::ensure!(weight > 0, "member weight must be greater than zero");
+        Ok(Self { addr, weight })
+    }
 }
 
 async fn update_members_message(
@@ -219,9 +248,9 @@ async fn update_members_message(
 ) -> Result<()> {
     let add: Vec<_> = add
         .into_iter()
-        .map(|addr| Member {
+        .map(|MemberToAdd { addr, weight }| Member {
             addr: addr.get_address_string(),
-            weight: 1,
+            weight,
         })
         .collect();
     let remove: Vec<_> = remove.into_iter().map(|x| x.get_address_string()).collect();
@@ -579,4 +608,37 @@ async fn send_coins_message(
         Err(e) => tracing::error!("Unable to simulate transaction: {e}"),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ADDRESS: &str = "osmo168gdk6r58jdwfv49kuesq2rs747jawnn4ryvyk";
+
+    #[test]
+    fn member_to_add_defaults_to_weight_one() {
+        let member: MemberToAdd = ADDRESS.parse().unwrap();
+
+        assert_eq!(member.addr.to_string(), ADDRESS);
+        assert_eq!(member.weight, 1);
+    }
+
+    #[test]
+    fn member_to_add_accepts_at_weight() {
+        let member: MemberToAdd = format!("{ADDRESS}@42").parse().unwrap();
+
+        assert_eq!(member.addr.to_string(), ADDRESS);
+        assert_eq!(member.weight, 42);
+    }
+
+    #[test]
+    fn member_to_add_rejects_zero_weight() {
+        let err = match format!("{ADDRESS}@0").parse::<MemberToAdd>() {
+            Ok(_) => panic!("zero weight should be rejected"),
+            Err(err) => err,
+        };
+
+        assert!(err.to_string().contains("greater than zero"));
+    }
 }
